@@ -1,0 +1,468 @@
+
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"><title>รายงานสรุปแผนความต้องการผลิตสินค้า</title>
+                <style>
+                    body { font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif; font-size: 14pt; color: #000; line-height: 1.3; }
+                    p { margin: 4px 0; font-size: 14pt; }
+                    h3 { color: #059669; margin-top: 15px; font-size: 16pt; font-weight: bold; border-bottom: 2px solid #059669; padding-bottom: 5px; }
+                    h4 { color: #059669; margin-top: 10px; margin-bottom: 5px; font-size: 14pt; font-weight: bold; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 5px; }
+                    th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: top; }
+                    th { background-color: #ecfdf5; color: #059669; font-weight: bold; }
+                    b { font-weight: bold; }
+                </style>
+                </head>
+                <body>
+                    <p><b>บันทึกข้อความ</b></p>
+                    <p><b>เรียน</b> ผู้บริหารฝ่ายผลิตและจัดซื้อ</p>
+                    <p><b>เรื่อง</b> รายงานสรุปแผนความต้องการผลิตสินค้า (Production Requirement Plan)</p>
+                    <p><b>วันที่ประเมิน</b> 9 กันยายน 2569</p>
+                    <br/>
+                    <p>ตามที่ฝ่ายวางแผนได้ทำการกระทบยอดเป้าหมายการขายและยอดสต๊อกคงเหลือปัจจุบัน ระบบได้ทำการประมวลผลรายการสินค้าที่ <b>"มีความจำเป็นต้องสั่งผลิตเพิ่มเติม"</b> โดยคำนวณหักลบสต๊อกและรวมการเผื่อความปลอดภัย (Safety Stock ที่ 20%) เป็นยอดผลิตแนะนำ เพื่อนำไปใช้เป็นข้อมูลประกอบการจัดหา Supplier ในขั้นตอนต่อไป มีรายละเอียดเรียงตามตัวอักษรดังนี้</p>
+                    <br/>
+                    <h3>สรุปรายการความต้องการผลิต (แยกตามกลุ่มสินค้า)</h3>
+                    <h4 style="margin-top: 15px; color: #059669;">📦 กลุ่มสินค้า: แบบเรียน ปฐมวัย</h4>
+                        <table style="font-size: 11pt;">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>รหัส</th><th>ชื่อสินค้า</th><th>ราคา/หน่วย</th>
+                                    <th>เป้าขาย</th><th>คงเหลือ</th>
+                                    <th>ยอดผลิตพื้นฐาน</th><th>ยอดผลิตแนะนำ (+20%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                
+                                    <tr>
+                                        <td style="text-align: center;">1</td>
+                                        <td>05032300B</td><td>คำกลอนสอน ก.ไก่</td><td>72</td>
+                                        <td>293</td><td>21</td>
+                                        <td>272</td><td><b>327</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">2</td>
+                                        <td>05001500G</td><td>ดรุณศึกษา ป.1</td><td>48</td>
+                                        <td>12,073</td><td>9,113</td>
+                                        <td>2,960</td><td><b>3,552</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">3</td>
+                                        <td>05001600F</td><td>ดรุณศึกษา ป.2</td><td>62</td>
+                                        <td>9,593</td><td>4,872</td>
+                                        <td>4,721</td><td><b>5,666</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">4</td>
+                                        <td>05001700G</td><td>ดรุณศึกษา ป.3</td><td>58</td>
+                                        <td>9,167</td><td>5,030</td>
+                                        <td>4,137</td><td><b>4,965</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">5</td>
+                                        <td>05001800G</td><td>ดรุณศึกษา ป.4</td><td>60</td>
+                                        <td>7,598</td><td>3,876</td>
+                                        <td>3,722</td><td><b>4,467</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">6</td>
+                                        <td>05001900F</td><td>ดรุณศึกษา ปฐมวัย</td><td>40</td>
+                                        <td>25,540</td><td>14,951</td>
+                                        <td>10,589</td><td><b>12,707</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">7</td>
+                                        <td>05032800B</td><td>บฝ. ดรุณศึกษา ป.1</td><td>60</td>
+                                        <td>3,301</td><td>2,802</td>
+                                        <td>499</td><td><b>599</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">8</td>
+                                        <td>05032900B</td><td>บฝ. ดรุณศึกษา ป.2</td><td>60</td>
+                                        <td>2,746</td><td>2,383</td>
+                                        <td>363</td><td><b>436</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">9</td>
+                                        <td>05033000A</td><td>บฝ. ดรุณศึกษา ป.3</td><td>60</td>
+                                        <td>2,790</td><td>2,534</td>
+                                        <td>256</td><td><b>308</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">10</td>
+                                        <td>05033100A</td><td>บฝ. ดรุณศึกษา ป.4</td><td>60</td>
+                                        <td>2,563</td><td>2,446</td>
+                                        <td>117</td><td><b>141</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">11</td>
+                                        <td>05000100E</td><td>แบบเรียน ก ข</td><td>48</td>
+                                        <td>2,830</td><td>1,681</td>
+                                        <td>1,149</td><td><b>1,379</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">12</td>
+                                        <td>06000500E</td><td>A B C BOOK II</td><td>45</td>
+                                        <td>636</td><td>305</td>
+                                        <td>331</td><td><b>398</b></td>
+                                    </tr>
+                                    
+                            </tbody>
+                        </table>
+                        <div style="background-color: #f0fdf4; border-left: 4px solid #059669; padding: 8px; margin-bottom: 15px; font-size: 12pt; color: #065f46;">
+                            <b>💡 บทสรุปและความเห็นประจำกลุ่ม:</b><br/>
+                            กลุ่มสินค้านี้มีความต้องการตามเป้าหมายรวม <b>79,130</b> เล่ม แต่มีสต๊อกรองรับเพียง <b>50,014</b> เล่ม 
+                            จึงจำเป็นต้องสั่งผลิตเพิ่มรวม <b>34,945</b> เล่ม <i>(ครอบคลุมการเผื่อความปลอดภัยทางสต๊อก หรือ Safety Stock 20% เรียบร้อยแล้ว)</i>
+                        </div>
+                    <h4 style="margin-top: 15px; color: #059669;">📦 กลุ่มสินค้า: ห้องสมุด ทวพ.</h4>
+                        <table style="font-size: 11pt;">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>รหัส</th><th>ชื่อสินค้า</th><th>ราคา/หน่วย</th>
+                                    <th>เป้าขาย</th><th>คงเหลือ</th>
+                                    <th>ยอดผลิตพื้นฐาน</th><th>ยอดผลิตแนะนำ (+20%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                
+                                    <tr>
+                                        <td style="text-align: center;">1</td>
+                                        <td>-</td><td>CAN YOU GUESS</td><td>90</td>
+                                        <td>12</td><td>0</td>
+                                        <td>12</td><td><b>15</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">2</td>
+                                        <td>-</td><td>CLASSIC TALES LEVEL 1 : Rumpelstilskin + Audio CD</td><td>129</td>
+                                        <td>5</td><td>0</td>
+                                        <td>5</td><td><b>6</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">3</td>
+                                        <td>-</td><td>CLASSIC TALES LEVEL 1 : The Husband Who was to Mind the House + Audio CD</td><td>129</td>
+                                        <td>17</td><td>0</td>
+                                        <td>17</td><td><b>21</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">4</td>
+                                        <td>45013600A</td><td>Easy & Fun : The Three Little Pigs + Audio CD</td><td>145</td>
+                                        <td>20</td><td>4</td>
+                                        <td>16</td><td><b>20</b></td>
+                                    </tr>
+                                    
+                            </tbody>
+                        </table>
+                        <div style="background-color: #f0fdf4; border-left: 4px solid #059669; padding: 8px; margin-bottom: 15px; font-size: 12pt; color: #065f46;">
+                            <b>💡 บทสรุปและความเห็นประจำกลุ่ม:</b><br/>
+                            กลุ่มสินค้านี้มีความต้องการตามเป้าหมายรวม <b>54</b> เล่ม แต่มีสต๊อกรองรับเพียง <b>4</b> เล่ม 
+                            จึงจำเป็นต้องสั่งผลิตเพิ่มรวม <b>62</b> เล่ม <i>(ครอบคลุมการเผื่อความปลอดภัยทางสต๊อก หรือ Safety Stock 20% เรียบร้อยแล้ว)</i>
+                        </div>
+                    <h4 style="margin-top: 15px; color: #059669;">📦 กลุ่มสินค้า: แบบเรียน มัธยม</h4>
+                        <table style="font-size: 11pt;">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>รหัส</th><th>ชื่อสินค้า</th><th>ราคา/หน่วย</th>
+                                    <th>เป้าขาย</th><th>คงเหลือ</th>
+                                    <th>ยอดผลิตพื้นฐาน</th><th>ยอดผลิตแนะนำ (+20%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                
+                                    <tr>
+                                        <td style="text-align: center;">1</td>
+                                        <td>06050000F</td><td>EXPLORING READING & WRITING BOOK 1</td><td>105</td>
+                                        <td>1,748</td><td>1,745</td>
+                                        <td>3</td><td><b>4</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">2</td>
+                                        <td>06050200F</td><td>EXPLORING READING & WRITING BOOK 3</td><td>120</td>
+                                        <td>1,592</td><td>1,222</td>
+                                        <td>370</td><td><b>444</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">3</td>
+                                        <td>06117002A</td><td>FIFTY-FIFTY BOOK TWO</td><td>125</td>
+                                        <td>6,992</td><td>6,560</td>
+                                        <td>432</td><td><b>519</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">4</td>
+                                        <td>06106502A</td><td>FIFTY-FIFTY INTRO</td><td>125</td>
+                                        <td>10,040</td><td>6,705</td>
+                                        <td>3,335</td><td><b>4,002</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">5</td>
+                                        <td>-</td><td>FOCUS Students Book 1</td><td>145</td>
+                                        <td>703</td><td>0</td>
+                                        <td>703</td><td><b>844</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">6</td>
+                                        <td>-</td><td>FOCUS Students Book 2</td><td>145</td>
+                                        <td>1,219</td><td>0</td>
+                                        <td>1,219</td><td><b>1,463</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">7</td>
+                                        <td>-</td><td>FOCUS Students Book 3</td><td>145</td>
+                                        <td>432</td><td>0</td>
+                                        <td>432</td><td><b>519</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">8</td>
+                                        <td>06165002A</td><td>Get Involved! Student Book ม.1</td><td>155</td>
+                                        <td>42,591</td><td>27,859</td>
+                                        <td>14,732</td><td><b>17,679</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">9</td>
+                                        <td>06165302A</td><td>Get Involved! Student Book ม.4</td><td>155</td>
+                                        <td>36,890</td><td>24,559</td>
+                                        <td>12,331</td><td><b>14,798</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">10</td>
+                                        <td>06165402A</td><td>Get Involved! Student Book ม.5</td><td>155</td>
+                                        <td>28,854</td><td>26,600</td>
+                                        <td>2,254</td><td><b>2,705</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">11</td>
+                                        <td>-</td><td>MOVE IT! Students Book 1</td><td>135</td>
+                                        <td>1,170</td><td>0</td>
+                                        <td>1,170</td><td><b>1,404</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">12</td>
+                                        <td>-</td><td>MOVE IT! Students Book 2</td><td>135</td>
+                                        <td>1,230</td><td>0</td>
+                                        <td>1,230</td><td><b>1,476</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">13</td>
+                                        <td>-</td><td>MOVE IT! Students Book 3</td><td>135</td>
+                                        <td>858</td><td>0</td>
+                                        <td>858</td><td><b>1,030</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">14</td>
+                                        <td>06129502A</td><td>Moving Up Critical Reading Book 1</td><td>125</td>
+                                        <td>7,550</td><td>4,224</td>
+                                        <td>3,326</td><td><b>3,992</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">15</td>
+                                        <td>06129602A</td><td>Moving Up Critical Reading Book 2</td><td>125</td>
+                                        <td>6,591</td><td>3,016</td>
+                                        <td>3,575</td><td><b>4,290</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">16</td>
+                                        <td>06129702A</td><td>Moving Up Critical Reading Book 3</td><td>125</td>
+                                        <td>7,680</td><td>2</td>
+                                        <td>7,678</td><td><b>9,214</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">17</td>
+                                        <td>06140002A</td><td>NEW Weaving It Together 1</td><td>150</td>
+                                        <td>30,329</td><td>16,671</td>
+                                        <td>13,658</td><td><b>16,390</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">18</td>
+                                        <td>06140102A</td><td>NEW Weaving It Together 2</td><td>150</td>
+                                        <td>27,546</td><td>19,914</td>
+                                        <td>7,632</td><td><b>9,159</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">19</td>
+                                        <td>06128001C</td><td>New World Student Book 1</td><td>129</td>
+                                        <td>50,020</td><td>1,279</td>
+                                        <td>48,741</td><td><b>58,490</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">20</td>
+                                        <td>06128101C</td><td>New World Student Book 2</td><td>129</td>
+                                        <td>49,959</td><td>1,608</td>
+                                        <td>48,351</td><td><b>58,022</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">21</td>
+                                        <td>06128201A</td><td>New World Student Book 3</td><td>124</td>
+                                        <td>48,222</td><td>13,443</td>
+                                        <td>34,779</td><td><b>41,735</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">22</td>
+                                        <td>06128301A</td><td>New World Student Book 4</td><td>124</td>
+                                        <td>30,275</td><td>9,684</td>
+                                        <td>20,591</td><td><b>24,710</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">23</td>
+                                        <td>06128401A</td><td>New World Student Book 5</td><td>124</td>
+                                        <td>28,485</td><td>12,587</td>
+                                        <td>15,898</td><td><b>19,078</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">24</td>
+                                        <td>06128501A</td><td>New World Student Book 6</td><td>124</td>
+                                        <td>24,827</td><td>8,618</td>
+                                        <td>16,209</td><td><b>19,451</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">25</td>
+                                        <td>06128601A</td><td>New World Workbook 1</td><td>60</td>
+                                        <td>17,985</td><td>224</td>
+                                        <td>17,761</td><td><b>21,314</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">26</td>
+                                        <td>06128701A</td><td>New World Workbook 2</td><td>60</td>
+                                        <td>18,377</td><td>514</td>
+                                        <td>17,863</td><td><b>21,436</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">27</td>
+                                        <td>06128801A</td><td>New World Workbook 3</td><td>60</td>
+                                        <td>17,112</td><td>6,555</td>
+                                        <td>10,557</td><td><b>12,669</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">28</td>
+                                        <td>06129202A</td><td>Step Up Reading & Writing Book 1</td><td>120</td>
+                                        <td>3,530</td><td>1,337</td>
+                                        <td>2,193</td><td><b>2,632</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">29</td>
+                                        <td>06129302A</td><td>Step Up Reading & Writing Book 2</td><td>120</td>
+                                        <td>3,835</td><td>2,160</td>
+                                        <td>1,675</td><td><b>2,010</b></td>
+                                    </tr>
+                                    
+                                    <tr>
+                                        <td style="text-align: center;">30</td>
+                                        <td>06129402A</td><td>Step Up Reading & Writing Book 3</td><td>120</td>
+                                        <td>3,328</td><td>2,941</td>
+                                        <td>387</td><td><b>465</b></td>
+                                    </tr>
+                                    
+                            </tbody>
+                        </table>
+                        <div style="background-color: #f0fdf4; border-left: 4px solid #059669; padding: 8px; margin-bottom: 15px; font-size: 12pt; color: #065f46;">
+                            <b>💡 บทสรุปและความเห็นประจำกลุ่ม:</b><br/>
+                            กลุ่มสินค้านี้มีความต้องการตามเป้าหมายรวม <b>509,970</b> เล่ม แต่มีสต๊อกรองรับเพียง <b>200,027</b> เล่ม 
+                            จึงจำเป็นต้องสั่งผลิตเพิ่มรวม <b>371,944</b> เล่ม <i>(ครอบคลุมการเผื่อความปลอดภัยทางสต๊อก หรือ Safety Stock 20% เรียบร้อยแล้ว)</i>
+                        </div>
+                    <h4 style="margin-top: 15px; color: #059669;">📦 กลุ่มสินค้า: สินค้าซื้อมา-ขายไป</h4>
+                        <table style="font-size: 11pt;">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>รหัส</th><th>ชื่อสินค้า</th><th>ราคา/หน่วย</th>
+                                    <th>เป้าขาย</th><th>คงเหลือ</th>
+                                    <th>ยอดผลิตพื้นฐาน</th><th>ยอดผลิตแนะนำ (+20%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                
+                                    <tr>
+                                        <td style="text-align: center;">1</td>
+                                        <td>39386800C</td><td>NGL CEFR Placement Test</td><td>108</td>
+                                        <td>700</td><td>18</td>
+                                        <td>682</td><td><b>819</b></td>
+                                    </tr>
+                                    
+                            </tbody>
+                        </table>
+                        <div style="background-color: #f0fdf4; border-left: 4px solid #059669; padding: 8px; margin-bottom: 15px; font-size: 12pt; color: #065f46;">
+                            <b>💡 บทสรุปและความเห็นประจำกลุ่ม:</b><br/>
+                            กลุ่มสินค้านี้มีความต้องการตามเป้าหมายรวม <b>700</b> เล่ม แต่มีสต๊อกรองรับเพียง <b>18</b> เล่ม 
+                            จึงจำเป็นต้องสั่งผลิตเพิ่มรวม <b>819</b> เล่ม <i>(ครอบคลุมการเผื่อความปลอดภัยทางสต๊อก หรือ Safety Stock 20% เรียบร้อยแล้ว)</i>
+                        </div>
+                    
+                    
+                    <table style="border: none; width: 100%; margin-top: 10px; margin-bottom: 5px;">
+                        <tbody>
+                            <tr style="font-weight: bold; color: #059669; background-color: #ecfdf5;">
+                                <td style="border: 1px solid #059669; text-align: right; width: 50%; padding: 8px;">สรุปรวมจำนวนรายการที่ต้องผลิตทั้งสิ้น:</td>
+                                <td style="border: 1px solid #059669; padding-left: 10px; width: 50%; padding: 8px;">47 รายการ</td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #059669;">
+                                <td style="border: 1px solid #059669; text-align: right; padding: 8px;">ยอดเป้าขายรวม (เฉพาะรายการผลิต):</td>
+                                <td style="border: 1px solid #059669; padding-left: 10px; padding: 8px;">589,854 เล่ม</td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #ef4444;">
+                                <td style="border: 1px solid #059669; text-align: right; padding: 8px;">ยอดสั่งผลิตแนะนำรวม (รวมเผื่อสต๊อก 20%):</td>
+                                <td style="border: 1px solid #059669; padding-left: 10px; padding: 8px; font-size: 16pt;">407,770 เล่ม</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <br/>
+                    <p>จึงเรียนมาเพื่อโปรดพิจารณา และนำยอดแนะนำดังกล่าวไปดำเนินการสืบราคาและคัดเลือก Supplier ในลำดับต่อไป</p>
+                    <br/><br/><br/>
+                    
+                    <table style="width: 100%; border: none; margin-top: 30px; text-align: center; font-size: 14pt;">
+                        <tr>
+                            <td style="border: none; width: 50%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>จัดทำแผนโดย</p>
+                                <p>ส่วนงานวางแผนและการตลาด</p>
+                            </td>
+                            <td style="border: none; width: 50%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>รับทราบและรับมอบข้อมูลเพื่อจัดซื้อ</p>
+                                <p>ส่วนงานจัดซื้อ</p>
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+            
