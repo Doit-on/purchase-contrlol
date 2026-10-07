@@ -1,0 +1,2168 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ระบบวิเคราะห์จัดซื้อและวางแผนผลิต - Version 1.63</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Sarabun', 'sans-serif'] },
+                    colors: { primary: '#002060', highlight: '#ef4444', planning: '#059669' }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body { font-size: 10px; background-color: #ffffff; color: #000000; }
+        h1, h2, h3, h4, th { color: #002060; font-weight: 700; }
+        .text-highlight { color: #ef4444; font-weight: 700; }
+        .table-container { max-height: calc(100vh - 410px); overflow-y: auto; overflow-x: auto; }
+        table { border-collapse: collapse; width: 100%; white-space: nowrap; }
+        th, td { border: 1px solid #e5e7eb; padding: 4px 8px; text-align: left; vertical-align: middle; }
+        th { background-color: #f9fafb; position: sticky; top: 0; z-index: 20; user-select: none; }
+        th:hover { background-color: #f3f4f6; }
+        input, select { border: 1px solid #ccc; padding: 4px; border-radius: 4px; width: 100%; font-size: 10px; background-color: transparent; transition: all 0.2s; }
+        input:focus, select:focus { outline: 1px solid #002060; background-color: #fff; box-shadow: 0 0 0 2px rgba(0,32,96,0.1); }
+        .sticky-footer { position: sticky; bottom: 0; background-color: #f3f4f6; z-index: 30; font-weight: bold; border-top: 2px solid #002060; }
+        .modal-overlay { background-color: rgba(0,0,0,0.5); z-index: 50; backdrop-filter: blur(2px); }
+        .docx-preview-content { font-family: 'Sarabun', sans-serif; font-size: 14pt; line-height: 1.3; color: #000; }
+        .docx-preview-content table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14pt; white-space: normal; }
+        .docx-preview-content th, .docx-preview-content td { border: 1px solid #000; padding: 4px; text-align: left; }
+        .docx-preview-content th { background-color: #f2f5f9; color: #002060; }
+        optgroup { font-weight: 700; color: #002060; }
+        option { color: #000; font-weight: normal; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        
+        .resize-wrapper {
+            resize: horizontal;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-width: 40px;
+            max-width: 600px;
+            padding-right: 5px;
+            cursor: col-resize;
+        }
+        .resize-wrapper > span { cursor: pointer; display: flex; align-items: center; flex: 1; }
+        .sort-icon { font-size: 8px; color: #888; margin-left: 4px; display: inline-block; }
+        .sort-icon.active { color: #ef4444; font-size: 10px; font-weight: bold; }
+    </style>
+
+    <!-- Dependencies -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, Component } = React;
+
+        // ==========================================
+        // 1. CONSTANTS & PURE FUNCTIONS
+        // ==========================================
+        const VERSION = "Version 1.63 (Strict Matching & Auto-Healing)";
+        const CURRENT_DATE = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
+        const PREDEFINED_GROUPS = ["แบบเรียน มัธยม", "แบบเรียน ปฐมวัย", "ห้องสมุด", "สินค้าซื้อมา-ขายไป", "พจนานุกรม"];
+
+        const CHANGELOG = [
+            { ver: "1.63", detail: "Strict Matching Engine: กำหนดกฎจับคู่ 3 ชั้น (ราคาต้องตรง, รหัสต้องตรง, ชื่อต้องตรง) เพื่อป้องกันสินค้าเวอร์ชันต่างราคาถูกหลอมรวมกัน" },
+            { ver: "1.58", detail: "3-Way Verification UI: แสดง 'รหัสสินค้า' และ 'ราคาปก' ในตารางวิเคราะห์และตะกร้า เพื่อยืนยันความถูกต้อง" },
+            { ver: "1.56", detail: "Core Stabilization: เปลี่ยนการประกาศฟังก์ชันทั้งหมดเป็น Standard Function (Hoisting) ขจัดปัญหาจอขาว" }
+        ];
+
+        const safeStorage = {
+            get: function(key) { try { return localStorage.getItem(key); } catch (e) { return null; } },
+            set: function(key, value) { try { localStorage.setItem(key, value); } catch (e) {} },
+            remove: function(key) { try { localStorage.removeItem(key); } catch (e) {} }
+        };
+
+        function getFormattedDateStrings() {
+            const d = new Date();
+            const thYear = d.getFullYear() + 543;
+            const dStr = `${String(d.getDate()).padStart(2, '0')}-${String(d.getMonth() + 1).padStart(2, '0')}-${thYear}`;
+            return { thYear, dStr };
+        }
+
+        function formatNum(num) {
+            if (!num || isNaN(num)) return "0";
+            return Number(num).toLocaleString('th-TH', { maximumFractionDigits: 2 });
+        }
+
+        function parseNum(str) {
+            if (str === null || str === undefined || str === '') return 0;
+            if (typeof str === 'number') return str;
+            let cleaned = String(str).replace(/,/g, '').replace(/\s/g, '');
+            let match = cleaned.match(/-?\d+(\.\d+)?/);
+            return match ? Number(match[0]) : 0;
+        }
+
+        function calcCostPct(cost, price) {
+            return price > 0 ? ((cost / price) * 100).toFixed(1) : "0.0";
+        }
+
+        function getRecQty(p, safetyStockPct) {
+            const baseNeed = Math.max(0, parseNum(p.target) - parseNum(p.stock));
+            return baseNeed + Math.ceil(baseNeed * (safetyStockPct / 100));
+        }
+
+        // --- NEW: Strict Match Logic (หัวใจสำคัญในการรวมยอดที่แม่นยำ) ---
+        function isSameProduct(p1, p2) {
+            const code1 = String(p1.productCode || "").trim().toUpperCase();
+            const code2 = String(p2.productCode || "").trim().toUpperCase();
+            const name1 = String(p1.name || "").trim().toLowerCase();
+            const name2 = String(p2.name || "").trim().toLowerCase();
+            const price1 = Number(p1.price) || 0;
+            const price2 = Number(p2.price) || 0;
+
+            // กฎข้อ 1: ถ้าราคามีทั้งคู่ และไม่เท่ากัน -> คนละสินค้า 100% (ห้ามรวมเด็ดขาด)
+            if (price1 > 0 && price2 > 0 && price1 !== price2) {
+                return false;
+            }
+
+            // กฎข้อ 2: ถ้ารหัสมีทั้งคู่ -> รหัสต้องตรงกันเท่านั้น
+            if (code1 && code2) {
+                return code1 === code2;
+            }
+
+            // กฎข้อ 3: ถ้ารหัสไม่มี หรือ มีรหัสข้างเดียว -> ใช้ชื่อสินค้าเป็นเกณฑ์หลัก
+            if (name1 && name2) {
+                return name1 === name2;
+            }
+
+            return false;
+        }
+
+        function calculateValues(row) {
+            const price = parseNum(row.price);
+            const cost = parseNum(row.cost);
+            const discount = parseNum(row.discount);
+            const produceQty = parseNum(row.produceQty);
+            const target = parseNum(row.target);
+
+            const netPrice = price - (price * (discount / 100));
+            const totalCost = cost * produceQty;
+            const vatAmount = totalCost * 0.07;
+            const totalWithVat = totalCost + vatAmount;
+            const costPct = calcCostPct(cost, price);
+            
+            const bepQty = netPrice > 0 ? Math.ceil(totalCost / netPrice) : 0;
+            
+            let advice = "พิจารณาอีกครั้ง";
+            if (produceQty > 0 && bepQty > 0) {
+                advice = produceQty >= bepQty ? "ควรผลิต" : "ไม่ควรผลิต";
+            }
+
+            return { 
+                ...row, netPrice, bepQty, bepMoney: totalCost, vatAmount, 
+                totalWithVat, costPct, advice, 
+                totalSalesCover: target * price, totalSalesNet: target * netPrice
+            };
+        }
+
+        function generatePlanDocxHtmlString(planData, safetyStockPct) {
+            let productionItems = (planData || []).filter(p => getRecQty(p, safetyStockPct) > 0);
+            
+            // SORTING A-Z , ก-ฮ
+            productionItems.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'));
+
+            const prodGroups = {};
+            let totalItems = 0;
+            let totalTarget = 0;
+            let totalStock = 0;
+            let totalRecommended = 0;
+
+            productionItems.forEach(item => {
+                const g = item.group || 'ทั่วไป';
+                if (!prodGroups[g]) prodGroups[g] = [];
+                prodGroups[g].push(item);
+                
+                totalItems++;
+                totalTarget += parseNum(item.target);
+                totalStock += parseNum(item.stock);
+                totalRecommended += getRecQty(item, safetyStockPct);
+            });
+
+            let groupsHtml = '';
+            if (Object.keys(prodGroups).length === 0) {
+                groupsHtml = '<p style="text-align: center; color: #666;">ไม่มีรายการที่ต้องผลิต</p>';
+            } else {
+                Object.entries(prodGroups).forEach(([gName, items]) => {
+                    let groupTarget = 0;
+                    let groupStock = 0;
+                    let groupRec = 0;
+                    items.forEach(i => {
+                        groupTarget += parseNum(i.target);
+                        groupStock += parseNum(i.stock);
+                        groupRec += getRecQty(i, safetyStockPct);
+                    });
+
+                    groupsHtml += `<h4 style="margin-top: 15px; color: #059669;">📦 กลุ่มสินค้า: ${gName}</h4>`;
+                    groupsHtml += `
+                        <table style="font-size: 11pt;">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>รหัส</th><th>ชื่อสินค้า</th><th>ราคา/หน่วย</th>
+                                    <th>เป้าขาย</th><th>คงเหลือ</th>
+                                    <th>ยอดผลิตพื้นฐาน</th><th>ยอดผลิตแนะนำ (+${safetyStockPct}%)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.map((r, index) => {
+                                    const baseNeed = Math.max(0, parseNum(r.target) - parseNum(r.stock));
+                                    const recQty = getRecQty(r, safetyStockPct);
+                                    return `
+                                    <tr>
+                                        <td style="text-align: center;">${index + 1}</td>
+                                        <td>${r.productCode || '-'}</td><td>${r.name}</td><td>${formatNum(r.price)}</td>
+                                        <td>${formatNum(r.target)}</td><td>${formatNum(r.stock)}</td>
+                                        <td>${formatNum(baseNeed)}</td><td><b>${formatNum(recQty)}</b></td>
+                                    </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                        <div style="background-color: #f0fdf4; border-left: 4px solid #059669; padding: 8px; margin-bottom: 15px; font-size: 12pt; color: #065f46;">
+                            <b>💡 บทสรุปและความเห็นประจำกลุ่ม:</b><br/>
+                            กลุ่มสินค้านี้มีความต้องการตามเป้าหมายรวม <b>${formatNum(groupTarget)}</b> เล่ม แต่มีสต๊อกรองรับเพียง <b>${formatNum(groupStock)}</b> เล่ม 
+                            จึงจำเป็นต้องสั่งผลิตเพิ่มรวม <b>${formatNum(groupRec)}</b> เล่ม <i>(ครอบคลุมการเผื่อความปลอดภัยทางสต๊อก หรือ Safety Stock ${safetyStockPct}% เรียบร้อยแล้ว)</i>
+                        </div>
+                    `;
+                });
+            }
+
+            return `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"><title>รายงานสรุปแผนความต้องการผลิตสินค้า</title>
+                <style>
+                    body { font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif; font-size: 14pt; color: #000; line-height: 1.3; }
+                    p { margin: 4px 0; font-size: 14pt; }
+                    h3 { color: #059669; margin-top: 15px; font-size: 16pt; font-weight: bold; border-bottom: 2px solid #059669; padding-bottom: 5px; }
+                    h4 { color: #059669; margin-top: 10px; margin-bottom: 5px; font-size: 14pt; font-weight: bold; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 5px; }
+                    th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: top; }
+                    th { background-color: #ecfdf5; color: #059669; font-weight: bold; }
+                    b { font-weight: bold; }
+                </style>
+                </head>
+                <body>
+                    <p><b>บันทึกข้อความ</b></p>
+                    <p><b>เรียน</b> ผู้บริหารฝ่ายผลิตและจัดซื้อ</p>
+                    <p><b>เรื่อง</b> รายงานสรุปแผนความต้องการผลิตสินค้า (Production Requirement Plan)</p>
+                    <p><b>วันที่ประเมิน</b> ${CURRENT_DATE}</p>
+                    <br/>
+                    <p>ตามที่ฝ่ายวางแผนได้ทำการกระทบยอดเป้าหมายการขายและยอดสต๊อกคงเหลือปัจจุบัน ระบบได้ทำการประมวลผลรายการสินค้าที่ <b>"มีความจำเป็นต้องสั่งผลิตเพิ่มเติม"</b> โดยคำนวณหักลบสต๊อกและรวมการเผื่อความปลอดภัย (Safety Stock ที่ ${safetyStockPct}%) เป็นยอดผลิตแนะนำ เพื่อนำไปใช้เป็นข้อมูลประกอบการจัดหา Supplier ในขั้นตอนต่อไป มีรายละเอียดเรียงตามตัวอักษรดังนี้</p>
+                    <br/>
+                    <h3>สรุปรายการความต้องการผลิต (แยกตามกลุ่มสินค้า)</h3>
+                    ${groupsHtml}
+                    
+                    <table style="border: none; width: 100%; margin-top: 10px; margin-bottom: 5px;">
+                        <tbody>
+                            <tr style="font-weight: bold; color: #059669; background-color: #ecfdf5;">
+                                <td style="border: 1px solid #059669; text-align: right; width: 50%; padding: 8px;">สรุปรวมจำนวนรายการที่ต้องผลิตทั้งสิ้น:</td>
+                                <td style="border: 1px solid #059669; padding-left: 10px; width: 50%; padding: 8px;">${formatNum(totalItems)} รายการ</td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #059669;">
+                                <td style="border: 1px solid #059669; text-align: right; padding: 8px;">ยอดเป้าขายรวม (เฉพาะรายการผลิต):</td>
+                                <td style="border: 1px solid #059669; padding-left: 10px; padding: 8px;">${formatNum(totalTarget)} เล่ม</td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #ef4444;">
+                                <td style="border: 1px solid #059669; text-align: right; padding: 8px;">ยอดสั่งผลิตแนะนำรวม (รวมเผื่อสต๊อก ${safetyStockPct}%):</td>
+                                <td style="border: 1px solid #059669; padding-left: 10px; padding: 8px; font-size: 16pt;">${formatNum(totalRecommended)} เล่ม</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <br/>
+                    <p>จึงเรียนมาเพื่อโปรดพิจารณา และนำยอดแนะนำดังกล่าวไปดำเนินการสืบราคาและคัดเลือก Supplier ในลำดับต่อไป</p>
+                    <br/><br/><br/>
+                    
+                    <table style="width: 100%; border: none; margin-top: 30px; text-align: center; font-size: 14pt;">
+                        <tr>
+                            <td style="border: none; width: 50%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>จัดทำแผนโดย</p>
+                                <p>ส่วนงานวางแผนและการตลาด</p>
+                            </td>
+                            <td style="border: none; width: 50%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>รับทราบและรับมอบข้อมูลเพื่อจัดซื้อ</p>
+                                <p>ส่วนงานจัดซื้อ</p>
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+            `;
+        }
+
+        function generateDocxHtmlString(data, totalItems, totalQty, totalCost, totalVat, totalNet, assumedDiscount) {
+            let productionItems = (data || []).filter(r => r.advice === 'ควรผลิต');
+            
+            // SORTING A-Z , ก-ฮ
+            productionItems.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'));
+
+            const prodGroups = {};
+            productionItems.forEach(item => {
+                const g = item.group || 'ทั่วไป';
+                if (!prodGroups[g]) prodGroups[g] = [];
+                prodGroups[g].push(item);
+            });
+
+            let groupsHtml = '';
+            if (Object.keys(prodGroups).length === 0) {
+                groupsHtml = '<p style="text-align: center; color: #666;">ไม่มีรายการที่แนะนำให้ผลิต</p>';
+            } else {
+                Object.entries(prodGroups).forEach(([gName, items]) => {
+                    groupsHtml += `<h4 style="margin-top: 15px; color: #002060;">📁 กลุ่มสินค้า: ${gName}</h4>`;
+                    groupsHtml += `
+                        <table style="font-size: 11pt;">
+                            <thead>
+                                <tr>
+                                    <th>ลำดับ</th>
+                                    <th>รหัส</th><th>ชื่อหนังสือ</th><th>ผู้เขียน</th><th>ปก</th>
+                                    <th>ผลิต</th><th>ทุน/เล่ม (%)</th><th>รวมทุน</th>
+                                    <th>VAT 7%</th><th>รวมสุทธิ</th><th>Supplier</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${items.map((r, index) => `
+                                    <tr>
+                                        <td style="text-align: center;">${index + 1}</td>
+                                        <td>${r.productCode || '-'}</td><td>${r.name}</td><td>${r.author || '-'}</td>
+                                        <td>${formatNum(r.price)}</td><td>${formatNum(r.produceQty)}</td>
+                                        <td>${formatNum(r.cost)} <span style="color: #ef4444;">(${r.costPct}%)</span></td>
+                                        <td>${formatNum(r.bepMoney)}</td><td>${formatNum(r.vatAmount)}</td>
+                                        <td><b>${formatNum(r.totalWithVat)}</b></td><td>${r.printer}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    `;
+                });
+            }
+
+            return `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">
+                <head><meta charset="utf-8"><title>รายงานการวิเคราะห์และเสนอการผลิต</title>
+                <style>
+                    body { font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif; font-size: 14pt; color: #000; line-height: 1.3; }
+                    p { margin: 4px 0; font-size: 14pt; }
+                    h3 { color: #002060; margin-top: 15px; font-size: 14pt; font-weight: bold; }
+                    h4 { color: #002060; margin-top: 10px; margin-bottom: 5px; font-size: 14pt; font-weight: bold; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 5px; margin-bottom: 5px; }
+                    th, td { border: 1px solid #000; padding: 4px; text-align: left; vertical-align: top; }
+                    th { background-color: #f2f5f9; color: #002060; font-weight: bold; }
+                    b { font-weight: bold; }
+                </style>
+                </head>
+                <body>
+                    <p><b>บันทึกข้อความ</b></p>
+                    <p><b>เรียน</b> กรรมการผู้จัดการ</p>
+                    <p><b>เรื่อง</b> ขอนำเสนอ และ อนุมัติ การผลิตสินค้าประจำปี</p>
+                    <p><b>วันที่</b> ${CURRENT_DATE}</p>
+                    <br/>
+                    <p>ตามที่ฝ่ายที่เกี่ยวข้องได้ดำเนินกระบวนการวิเคราะห์และจัดซื้อสินค้า ทางฝ่ายได้ทำการประเมินจุดคุ้มทุน (BEP), ต้นทุนการผลิต, เป้าการขาย และคัดเลือก Supplier ที่มีความคุ้มค่าสูงสุดเรียบร้อยแล้ว จึงขอนำเสนอรายละเอียดการวิเคราะห์และแผนการผลิต <b>เฉพาะกลุ่มสินค้าที่มีรายการอนุมัติให้ผลิต</b> ดังรายละเอียดที่เรียงลำดับตามตัวอักษรด้านล่างนี้</p>
+                    <br/>
+                    <h3>สรุปรายการกลุ่มสินค้าที่เสนอขออนุมัติการผลิต</h3>
+                    ${groupsHtml}
+                    
+                    <table style="border: none; width: 100%; margin-top: 10px; margin-bottom: 5px;">
+                        <tbody>
+                            <tr style="font-weight: bold; color: #002060;">
+                                <td style="border: none; text-align: right; width: 35%;">สรุปรวมการผลิตทั้งหมด (${formatNum(totalItems)} รายการ):</td>
+                                <td style="border: none; padding-left: 10px; width: 15%;">${formatNum(totalQty)} เล่ม</td>
+                                <td style="border: none; text-align: right; width: 15%;">มูลค่าทุนก่อน VAT:</td>
+                                <td style="border: none; padding-left: 10px;">${formatNum(totalCost)} ฿</td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #002060;">
+                                <td style="border: none;" colspan="2"></td>
+                                <td style="border: none; text-align: right;">ยอดรวม VAT (7%):</td>
+                                <td style="border: none; padding-left: 10px;">${formatNum(totalVat)} ฿</td>
+                            </tr>
+                            <tr style="font-weight: bold; color: #ef4444;">
+                                <td style="border: none;" colspan="2"></td>
+                                <td style="border: none; text-align: right;">มูลค่าลงทุนสุทธิ (รวม VAT):</td>
+                                <td style="border: none; padding-left: 10px;">${formatNum(totalNet)} ฿</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p style="color: #ef4444; font-size: 10pt; margin-top: 5px;">*หมายเหตุ : อ้างอิงส่วนลดการค้าสมมุติฐาน ${assumedDiscount}% ตามที่ระบุในระบบ</p>
+                    
+                    <br/>
+                    <p>จึงเรียนมาเพื่อโปรดพิจารณาอนุมัติดำเนินการ</p>
+                    <br/><br/><br/>
+                    
+                    <table style="width: 100%; border: none; margin-top: 30px; text-align: center; font-size: 14pt;">
+                        <tr>
+                            <td style="border: none; width: 33%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>นำเสนอโดย</p>
+                                <p>ส่วนงานจัดซื้อ/เลขานุการ</p>
+                            </td>
+                            <td style="border: none; width: 33%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>พิจารณาเสนออนุมัติผลิต</p>
+                                <p>ผู้จัดการฝ่าย</p>
+                            </td>
+                            <td style="border: none; width: 33%; padding: 0 10px; vertical-align: bottom;">
+                                <p>................................................</p>
+                                <p>อนุมัติผลิต</p>
+                                <p>กรรมการผู้จัดการ</p>
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+            `;
+        }
+
+        // ==========================================
+        // 2. ERROR BOUNDARY
+        // ==========================================
+        class ErrorBoundary extends Component {
+            constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+            static getDerivedStateFromError(error) { return { hasError: true, error }; }
+            componentDidCatch(error, errorInfo) { console.error("System crashed:", error, errorInfo); }
+            render() {
+                if (this.state.hasError) {
+                    return (
+                        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+                            <div className="bg-white p-8 rounded-2xl shadow-2xl border-t-4 border-red-600 text-center max-w-lg">
+                                <h2 className="text-2xl font-bold text-red-600 mb-4">⚠️ ระบบพบข้อผิดพลาดร้ายแรง</h2>
+                                <p className="text-gray-700 mb-6 text-sm">ดูเหมือนว่าโครงสร้างข้อมูลเก่าที่อยู่ในเครื่องของท่าน (LocalStorage) ไม่ตรงกับเวอร์ชันปัจจุบัน ทำให้เกิดข้อผิดพลาดในการโหลดหน้าจอ (Fatal Error)</p>
+                                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="bg-red-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-red-700 transition">
+                                    🗑️ กดเพื่อล้างข้อมูลเก่าและรีเซ็ตระบบ
+                                </button>
+                                <p className="text-gray-400 mt-4 text-xs">Error: {this.state.error && this.state.error.toString()}</p>
+                            </div>
+                        </div>
+                    );
+                }
+                return this.props.children;
+            }
+        }
+
+        // ==========================================
+        // 3. MAIN APP COMPONENT
+        // ==========================================
+        function App() {
+            const [isLanding, setIsLanding] = useState(true);
+            const [activeMainTab, setActiveMainTab] = useState('planning'); 
+            const [isLoading, setIsLoading] = useState(false);
+            const [loadingText, setLoadingText] = useState("กำลังประมวลผล...");
+            
+            const [data, setData] = useState([]); 
+            const [planData, setPlanData] = useState([]); 
+            const [settings, setSettings] = useState({ printers: ['โรงพิมพ์ A', 'โรงพิมพ์ B'], products: [], suppliers: [] });
+            const [historyList, setHistoryList] = useState([]);
+            const [filesUploaded, setFilesUploaded] = useState({ target: "", stock: "", db: "" });
+
+            const [uploadMode, setUploadMode] = useState('qty');
+
+            const [searchTerm, setSearchTerm] = useState("");
+            const [searchGroup, setSearchGroup] = useState("");
+            const [searchType, setSearchType] = useState("");
+            const [searchName, setSearchName] = useState("");
+            const [quickAddSearch, setQuickAddSearch] = useState("");
+            
+            const [dashboardExpanded, setDashboardExpanded] = useState(true);
+            const [planDashboardExpanded, setPlanDashboardExpanded] = useState(true);
+
+            const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+            const [planSortConfig, setPlanSortConfig] = useState({ key: null, direction: 'asc' });
+            const [collapsedGroups, setCollapsedGroups] = useState({});
+            const [tableFilter, setTableFilter] = useState('all'); 
+            
+            const [targetProfitMargin, setTargetProfitMargin] = useState(20);
+            const [safetyStockPct, setSafetyStockPct] = useState(0); 
+            
+            const [showSettings, setShowSettings] = useState(false);
+            const [settingMenu, setSettingMenu] = useState(1);
+            const [showDocxPreview, setShowDocxPreview] = useState(false);
+            const [showPlanDocxPreview, setShowPlanDocxPreview] = useState(false); 
+            
+            const [showRestoreModal, setShowRestoreModal] = useState(false);
+            const [showHistoryModal, setShowHistoryModal] = useState(false);
+            const [showSupplierModal, setShowSupplierModal] = useState(false);
+            const [showUploadReminder, setShowUploadReminder] = useState(false);
+            const [showUploadSuccess, setShowUploadSuccess] = useState({ show: false, fileName: "", rowCount: 0 });
+            const [showHandbook, setShowHandbook] = useState(false);
+            const [showProfitInfo, setShowProfitInfo] = useState(false);
+            
+            const [newPrinter, setNewPrinter] = useState("");
+            const [newProd, setNewProd] = useState({ group: "", productCode: "", name: "", author: "", price: "", stock: 0, sold: 0, target: 0 });
+            const [newSupp, setNewSupp] = useState({ supplierName: "", productCode: "", productName: "", cost: "", printQty: "" });
+            const [compareSearch, setCompareSearch] = useState("");
+            const [compareDiscount, setCompareDiscount] = useState(30);
+            const [selectedCompareBasket, setSelectedCompareBasket] = useState([]); 
+            
+            const [pendingRestoreData, setPendingRestoreData] = useState(null);
+            const [pendingRestorePlan, setPendingRestorePlan] = useState(null);
+            const [newHistoryName, setNewHistoryName] = useState("");
+            const [loadedHistoryName, setLoadedHistoryName] = useState(null);
+            const [preHistorySnapshot, setPreHistorySnapshot] = useState(null);
+            const [step2SearchFocused, setStep2SearchFocused] = useState(false);
+
+            useEffect(() => {
+                let hasData = false;
+                try {
+                    const savedData = safeStorage.get('purchasing_app_data');
+                    if (savedData) { const p = JSON.parse(savedData); if (Array.isArray(p) && p.length > 0) { setPendingRestoreData(p); hasData = true; } }
+                    const savedPlan = safeStorage.get('purchasing_plan_data');
+                    if (savedPlan) { const p = JSON.parse(savedPlan); if (Array.isArray(p) && p.length > 0) { setPendingRestorePlan(p); hasData = true; } }
+                    const savedFiles = safeStorage.get('purchasing_uploaded_files');
+                    if (savedFiles) { const p = JSON.parse(savedFiles); if(p) setFilesUploaded({ target: p.target || "", stock: p.stock || "", db: p.db || "" }); }
+                } catch (e) { console.error("Hydration Error:", e); }
+                if (hasData) setShowRestoreModal(true);
+
+                try {
+                    const savedSettings = safeStorage.get('purchasing_app_settings');
+                    if (savedSettings) { 
+                        const p = JSON.parse(savedSettings); 
+                        if(p) setSettings({ printers: Array.isArray(p.printers) ? p.printers : ['โรงพิมพ์ A'], products: Array.isArray(p.products) ? p.products : [], suppliers: Array.isArray(p.suppliers) ? p.suppliers : [] }); 
+                    }
+                    const histories = safeStorage.get('purchasing_app_histories');
+                    if (histories) { const p = JSON.parse(histories); if(Array.isArray(p)) setHistoryList(p); }
+                } catch(e){ console.error("Settings Hydration Error:", e); }
+            }, []);
+
+            useEffect(() => { safeStorage.set('purchasing_app_data', JSON.stringify(data || [])); }, [data]);
+            useEffect(() => { safeStorage.set('purchasing_plan_data', JSON.stringify(planData || [])); }, [planData]);
+            useEffect(() => { safeStorage.set('purchasing_uploaded_files', JSON.stringify(filesUploaded)); }, [filesUploaded]);
+            useEffect(() => { safeStorage.set('purchasing_app_settings', JSON.stringify(settings)); }, [settings]);
+
+            useEffect(() => {
+                const handleBeforeUnload = (e) => {
+                    if (data.length > 0 || planData.length > 0) { e.preventDefault(); e.returnValue = ''; }
+                };
+                window.addEventListener('beforeunload', handleBeforeUnload);
+                return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+            }, [data, planData]);
+
+            function runWithLoading(text, callback) { setLoadingText(text); setIsLoading(true); setTimeout(() => { callback(); setIsLoading(false); }, 400); }
+            function handleLogout() { if (window.confirm("ต้องการออกจากระบบใช่หรือไม่?")) runWithLoading("กำลังออกจากระบบ...", () => setIsLanding(true)); }
+            function handleLogin() { setIsLanding(false); if (data.length === 0 && planData.length === 0 && !pendingRestoreData && !pendingRestorePlan) setShowUploadReminder(true); }
+            function handleRestoreYes() { runWithLoading("กำลังเตรียมพื้นที่ทำงาน...", () => { setData(pendingRestoreData || []); setPlanData(pendingRestorePlan || []); setShowRestoreModal(false); setIsLanding(false); }); }
+            function handleRestoreNo() { runWithLoading("กำลังล้างข้อมูลเพื่อเริ่มใหม่...", () => { safeStorage.remove('purchasing_app_data'); safeStorage.remove('purchasing_plan_data'); safeStorage.remove('purchasing_uploaded_files'); setData([]); setPlanData([]); setFilesUploaded({ target: "", stock: "", db: "" }); setShowRestoreModal(false); setIsLanding(false); }); }
+            function handleClearPlanData() { if (window.confirm("⚠️ คุณต้องการล้างข้อมูล 'ตารางเตรียมสต๊อกและวางแผน' (Tab 1) ทั้งหมดใช่หรือไม่?")) { setPlanData([]); setFilesUploaded(prev => ({...prev, target: "", stock: ""})); safeStorage.remove('purchasing_plan_data'); } }
+            function handleClearPurchasingData() { if (window.confirm("⚠️ คุณต้องการล้างข้อมูล 'ตารางวิเคราะห์จัดซื้อ' (Tab 2) ทั้งหมดใช่หรือไม่?")) { setData([]); safeStorage.remove('purchasing_app_data'); } }
+            function clearAllFilters() { setSearchGroup(""); setSearchType(""); setSearchName(""); setSearchTerm(""); }
+
+            function handleSort(key) { let direction = 'asc'; if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'; setSortConfig({ key, direction }); }
+            function handlePlanSort(key) { let direction = 'asc'; if (planSortConfig.key === key && planSortConfig.direction === 'asc') direction = 'desc'; setPlanSortConfig({ key, direction }); }
+            function getSortIcon(key, currentSort) { if (currentSort.key === key) return currentSort.direction === 'asc' ? <span className="sort-icon active">▲</span> : <span className="sort-icon active">▼</span>; return <span className="sort-icon">↕</span>; }
+
+            function loadMockDataForTesting() {
+                runWithLoading("กำลังจำลองข้อมูลสำหรับทดสอบ...", () => {
+                    const mockProducts = [
+                        { id: "p1", group: "แบบเรียน มัธยม", productCode: "06128001A", name: "New world student book 1", author: "Teacher", price: 124, stock: 9590, sold: 1500, target: 0 },
+                        { id: "p2", group: "แบบเรียน มัธยม", productCode: "06128001C", name: "New world student book 1", author: "Teacher", price: 129, stock: 0, sold: 8000, target: 12000 },
+                        { id: "p3", group: "พจนานุกรม", productCode: "D-TH-EN", name: "พจนานุกรม ไทย-อังกฤษ", author: "Teacher", price: 290, stock: 50, sold: 200, target: 1500 }
+                    ];
+
+                    const mockSuppliers = [
+                        { id: "s1", supplierName: "โรงพิมพ์ A", productCode: "06128001C", productName: "New world student book 1", cost: 45, printQty: 5000 },
+                        { id: "s3", supplierName: "โรงพิมพ์ A", productCode: "D-TH-EN", productName: "พจนานุกรม ไทย-อังกฤษ", cost: 110, printQty: 1000 }
+                    ];
+
+                    setSettings({ printers: ['โรงพิมพ์ A', 'โรงพิมพ์ B', 'โรงพิมพ์ C'], products: mockProducts, suppliers: mockSuppliers });
+                    setFilesUploaded({ target: "mock_target_sales.xlsx", stock: "mock_inventory.xlsx", db: "mock_settings.xlsx" });
+
+                    const mockPlan = mockProducts.map(p => ({
+                        id: p.id, group: p.group, type: "หนังสือ", name: p.name, productCode: p.productCode, price: p.price, lastYearSales: p.sold, target: p.target, stock: p.stock
+                    }));
+                    setPlanData(mockPlan);
+
+                    const mockPurchasing = [
+                        calculateValues({
+                            id: "m_pur_1", group: "แบบเรียน มัธยม", productCode: "06128001C", name: "New world student book 1", author: "Teacher",
+                            price: 129, stock: 0, sold: 8000, target: 12000, discount: 30, cost: 45, produceQty: 12000, printer: "โรงพิมพ์ A"
+                        })
+                    ];
+                    setData(mockPurchasing);
+                    setIsLanding(false);
+                    alert("✅ โหลดข้อมูลจำลองสำเร็จ!\n\nระบบพร้อมใช้งานครับ ลองตรวจสอบการแยกรายการ 124 บาท และ 129 บาท ได้เลยครับ");
+                });
+            }
+
+            function saveHistory() {
+                if (!newHistoryName.trim()) return alert("กรุณาระบุชื่อประวัติ/อ้างอิงเอกสารก่อนบันทึก");
+                runWithLoading("กำลังบันทึกประวัติงาน...", () => {
+                    const newHist = {
+                        id: Date.now(), name: newHistoryName, date: new Date().toLocaleString('th-TH'),
+                        data: data, planData: planData, settings: settings, files: filesUploaded
+                    };
+                    const updatedList = [...historyList, newHist];
+                    setHistoryList(updatedList);
+                    safeStorage.set('purchasing_app_histories', JSON.stringify(updatedList));
+                    setNewHistoryName("");
+                    alert("บันทึกประวัติการทำงานเรียบร้อยแล้ว");
+                });
+            }
+
+            function loadHistory(hist) {
+                if(window.confirm(`ต้องการโหลดข้อมูล "${hist.name}" ใช่หรือไม่? ข้อมูลตารางปัจจุบันจะถูกพักไว้`)) {
+                    runWithLoading(`กำลังโหลดข้อมูล: ${hist.name}...`, () => {
+                        if(!loadedHistoryName) setPreHistorySnapshot({ data: [...data], planData: [...planData], settings: JSON.parse(JSON.stringify(settings)), files: {...filesUploaded} });
+                        setData(hist.data || []);
+                        setPlanData(hist.planData || []);
+                        if(hist.settings) setSettings(hist.settings);
+                        if(hist.files) setFilesUploaded(hist.files);
+                        setLoadedHistoryName(hist.name);
+                        setShowHistoryModal(false);
+                    });
+                }
+            }
+
+            function exitHistoryMode() {
+                if(window.confirm("ต้องการยกเลิกการดูประวัติ และกลับสู่โหมดทำงานปกติใช่หรือไม่?")) {
+                    runWithLoading("กำลังกลับสู่โหมดปกติ...", () => {
+                        if(preHistorySnapshot) {
+                            setData(preHistorySnapshot.data || []);
+                            setPlanData(preHistorySnapshot.planData || []);
+                            setSettings(preHistorySnapshot.settings);
+                            setFilesUploaded(preHistorySnapshot.files || { target: "", stock: "", db: "" });
+                        } else {
+                            setData([]);
+                            setPlanData([]);
+                        }
+                        setLoadedHistoryName(null);
+                        setPreHistorySnapshot(null);
+                    });
+                }
+            }
+
+            function deleteHistory(id) {
+                if(window.confirm("ต้องการลบประวัติการทำงานนี้ใช่หรือไม่?")) {
+                    const updatedList = historyList.filter(h => h.id !== id);
+                    setHistoryList(updatedList);
+                    safeStorage.set('purchasing_app_histories', JSON.stringify(updatedList));
+                }
+            }
+
+            // ==========================================
+            // EXCEL EXTRACTION LOGIC (SMART AGGREGATION)
+            // ==========================================
+            function processExcelToPlan(rawData, fileType) {
+                let currentPlan = [...planData];
+                let currentSettings = [...settings.products];
+                
+                const aggregated = {};
+                
+                rawData.forEach(rowObj => {
+                    const rowKeys = Object.keys(rowObj);
+                    
+                    const getVal = (keys, excludeKeys = []) => {
+                        for (let key of keys) {
+                            const exactMatch = rowKeys.find(k => k.trim().toLowerCase() === key.toLowerCase());
+                            if (exactMatch && rowObj[exactMatch] !== undefined && rowObj[exactMatch] !== "") return rowObj[exactMatch];
+                        }
+                        for (let key of keys) {
+                            const includesMatch = rowKeys.find(k => {
+                                const lowerK = k.trim().toLowerCase();
+                                const isMatch = lowerK.includes(key.toLowerCase());
+                                const isExcluded = excludeKeys.some(ex => lowerK.includes(ex.toLowerCase()));
+                                return isMatch && !isExcluded;
+                            });
+                            if (includesMatch && rowObj[includesMatch] !== undefined && rowObj[includesMatch] !== "") return rowObj[includesMatch];
+                        }
+                        return null; 
+                    };
+
+                    const nameRaw = getVal(['ชื่อสินค้า', 'รายการสินค้า', 'ชื่อหนังสือ', 'สินค้า', 'item name', 'name']);
+                    if (!nameRaw) return; 
+
+                    const lowerName = String(nameRaw).toLowerCase().trim();
+                    if (['รวม', 'ยอดรวม', 'total', 'grand total'].includes(lowerName)) return;
+
+                    const codeRaw = getVal(['รหัสสินค้า', 'รหัส', 'code', 'item code']);
+                    const safeCode = codeRaw ? String(codeRaw).trim().toUpperCase() : "";
+                    const safeName = String(nameRaw).trim().toUpperCase();
+                    
+                    const itemPriceRaw = parseNum(getVal(['ราคาปก', 'ราคา/หน่วย', 'ราคา', 'price']));
+                    const safePrice = itemPriceRaw > 0 ? itemPriceRaw : '0';
+                    
+                    // The internal key for aggregation within the SAME file
+                    // Uses strict matching to prevent accidental merge inside the file
+                    const key = `${safeCode}_${safeName}_${safePrice}`;
+
+                    const excludeKeys = uploadMode === 'qty' 
+                        ? ['บาท', 'เงิน', 'มูลค่า', 'amount', 'value', 'price', 'ยอดเงิน', 'baht']
+                        : ['จำนวน', 'เล่ม', 'qty', 'quantity', 'ชิ้น', 'หน่วย'];
+
+                    const targetRaw = getVal(['จำนวนเป้าหมาย', 'รวมเป้าขาย', 'เป้าขาย', 'เป้าหมาย', 'เป้า', 'target'], excludeKeys);
+                    const stockRaw = getVal(['จำนวนคงเหลือ', 'คงเหลือทุกคลัง', 'คงเหลือ', 'สต๊อกสินค้า', 'ยอดยกมา', 'stock', 'balance', 'inventory'], excludeKeys);
+                    const soldRaw = getVal(['จำนวนเล่มที่ขาย', 'จำนวนขาย', 'ยอดขายปีล่าสุด', 'ยอดขายปีที่แล้ว', 'ยอดขาย', 'sold', 'sales'], excludeKeys);
+                    
+                    const targetVal = targetRaw !== null ? parseNum(targetRaw) : null;
+                    const stockVal = stockRaw !== null ? parseNum(stockRaw) : null;
+                    const soldVal = soldRaw !== null ? parseNum(soldRaw) : null;
+
+                    if (!aggregated[key]) {
+                        aggregated[key] = {
+                            name: String(nameRaw).trim(),
+                            productCode: codeRaw ? String(codeRaw).trim() : "",
+                            group: getVal(['กลุ่มสินค้า', 'หมวดหมู่']) || "",
+                            type: getVal(['ประเภทสินค้า', 'ประเภท']) || "",
+                            price: itemPriceRaw,
+                            target: targetVal,
+                            stock: stockVal,
+                            sold: soldVal
+                        };
+                    } else {
+                        if (targetVal !== null) aggregated[key].target = (aggregated[key].target || 0) + targetVal;
+                        if (stockVal !== null) aggregated[key].stock = (aggregated[key].stock || 0) + stockVal;
+                        if (soldVal !== null) aggregated[key].sold = (aggregated[key].sold || 0) + soldVal;
+                    }
+                });
+
+                // Merge into current Plan & Settings using Smart Match
+                Object.values(aggregated).forEach(item => {
+                    const findIndexStrict = (arr) => {
+                        return arr.findIndex(p => isSameProduct(item, p));
+                    };
+
+                    const dbIdx = findIndexStrict(currentSettings);
+                    const existingDbItem = dbIdx >= 0 ? currentSettings[dbIdx] : null;
+                    let finalPrice = item.price > 0 ? item.price : (existingDbItem ? existingDbItem.price : 0);
+
+                    const convertToQty = (val) => {
+                        if (val === null) return null;
+                        if (uploadMode === 'amount') {
+                            if (finalPrice > 0) return Math.round(val / finalPrice);
+                            return 0; 
+                        }
+                        return val; 
+                    };
+
+                    const finalTarget = convertToQty(item.target);
+                    const finalStock = convertToQty(item.stock);
+                    const finalSold = convertToQty(item.sold);
+
+                    const existingPlanIdx = findIndexStrict(currentPlan);
+                    let planItem = existingPlanIdx >= 0 ? currentPlan[existingPlanIdx] : { id: Date.now() + Math.random(), name: item.name, productCode: item.productCode };
+
+                    if (finalTarget !== null) planItem.target = finalTarget;
+                    if (finalStock !== null) planItem.stock = finalStock;
+                    if (finalSold !== null) planItem.lastYearSales = finalSold;
+                    if (finalPrice > 0) planItem.price = finalPrice;
+                    if (item.group) planItem.group = item.group;
+                    if (item.type) planItem.type = item.type;
+                    
+                    // Auto-Heal: If uploaded item has a code but existing doesn't, update it
+                    if (item.productCode && !planItem.productCode) planItem.productCode = item.productCode;
+                    // Auto-Heal: If existing has a code but uploaded doesn't, inherit it
+                    if (!item.productCode && planItem.productCode) item.productCode = planItem.productCode;
+
+                    if (existingPlanIdx >= 0) currentPlan[existingPlanIdx] = planItem;
+                    else currentPlan.push(planItem);
+
+                    if (dbIdx >= 0) {
+                        if (finalTarget !== null) currentSettings[dbIdx].target = finalTarget;
+                        if (finalStock !== null) currentSettings[dbIdx].stock = finalStock;
+                        if (finalSold !== null) currentSettings[dbIdx].sold = finalSold;
+                        if (finalPrice > 0) currentSettings[dbIdx].price = finalPrice;
+                        if (item.group) currentSettings[dbIdx].group = item.group;
+                        if (item.productCode && !currentSettings[dbIdx].productCode) currentSettings[dbIdx].productCode = item.productCode;
+                    } else {
+                        currentSettings.push({
+                            id: Date.now() + Math.random(),
+                            group: item.group || "ทั่วไป",
+                            productCode: item.productCode || "",
+                            name: item.name,
+                            author: "",
+                            price: finalPrice || 0,
+                            stock: finalStock || 0,
+                            sold: finalSold || 0,
+                            target: finalTarget || 0
+                        });
+                    }
+                });
+
+                setPlanData(currentPlan);
+                setSettings(prev => ({...prev, products: currentSettings}));
+            }
+
+            function handleUploadPlanFile(e, fileType) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                runWithLoading(`กำลังอ่านไฟล์ ${fileType === 'target' ? 'เป้าหมาย' : 'สต๊อก'}...`, () => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const bstr = evt.target.result;
+                            const wb = XLSX.read(bstr, { type: 'binary' });
+                            const ws = wb.Sheets[wb.SheetNames[0]];
+                            const rawData = XLSX.utils.sheet_to_json(ws, { defval: "" });
+                            processExcelToPlan(rawData, fileType);
+                            setFilesUploaded(prev => ({...prev, [fileType]: file.name}));
+                            alert(`ดึงและแปลงข้อมูลเข้าตารางสำเร็จ\n\n(จัดการรวมยอดซ้ำซ้อน และแยกรายการสินค้าที่ชื่อเหมือนกันแต่ราคาต่างกันเรียบร้อยแล้ว)`);
+                        } catch (err) {
+                            alert("เกิดข้อผิดพลาดในการอ่านไฟล์");
+                        }
+                    };
+                    reader.readAsBinaryString(file);
+                });
+                e.target.value = null;
+            }
+
+            function sendPlanToPurchasing() {
+                const itemsToProduce = planData.filter(p => Math.max(0, p.target - p.stock) > 0);
+                if (itemsToProduce.length === 0) return alert("ไม่มีรายการที่ยอดเป้าหมายเกินสต๊อก (ไม่ต้องผลิต)");
+
+                runWithLoading("กำลังคำนวณและส่งรายการไปยังระบบจัดซื้อ...", () => {
+                    let updatedSettingsProd = [...settings.products];
+                    let newDataRows = [];
+
+                    itemsToProduce.forEach(p => {
+                        const dbIdx = updatedSettingsProd.findIndex(db => isSameProduct(p, db));
+
+                        if (dbIdx >= 0) {
+                            updatedSettingsProd[dbIdx].stock = p.stock || updatedSettingsProd[dbIdx].stock;
+                            updatedSettingsProd[dbIdx].target = p.target || updatedSettingsProd[dbIdx].target;
+                            updatedSettingsProd[dbIdx].price = p.price || updatedSettingsProd[dbIdx].price;
+                        }
+
+                        const recommendedQty = getRecQty(p, safetyStockPct);
+
+                        const existingInMain = data.find(d => isSameProduct(p, d));
+                        if (!existingInMain && recommendedQty > 0) {
+                            const dbProd = dbIdx >= 0 ? updatedSettingsProd[dbIdx] : null;
+                            newDataRows.push(calculateValues({
+                                id: Date.now() + Math.random(),
+                                group: p.group || "ทั่วไป",
+                                productCode: p.productCode || "",
+                                name: p.name,
+                                author: dbProd ? dbProd.author : "",
+                                price: p.price || 0,
+                                stock: p.stock || 0,
+                                sold: p.lastYearSales || 0,
+                                target: p.target || 0,
+                                discount: 30,
+                                cost: 0,
+                                produceQty: recommendedQty, 
+                                printer: ""
+                            }));
+                        }
+                    });
+
+                    setSettings(prev => ({ ...prev, products: updatedSettingsProd }));
+                    if (newDataRows.length > 0) {
+                        setData(prev => [...(prev || []), ...newDataRows]);
+                        alert(`ส่งมอบ ${newDataRows.length} รายการไปยังตารางวิเคราะห์จัดซื้อเรียบร้อยแล้ว\n\n(คำนวณยอดที่ต้องผลิต พร้อมบวก ${safetyStockPct}% เผื่อสต๊อกแล้ว)`);
+                        setActiveMainTab('purchasing');
+                    } else {
+                        alert("รายการทั้งหมดถูกส่งไปที่ตารางจัดซื้อแล้ว (หรือถูกแก้ไขจำนวนในตารางหลักแล้ว)");
+                    }
+                });
+            }
+
+            // ==========================================
+            // MAIN TABLE HANDLERS (TAB 2)
+            // ==========================================
+            function handleCellChange(id, field, value) {
+                setData(prevData => (prevData || []).map(row => {
+                    if (row.id !== id) return row;
+                    let updatedRow = { ...row, [field]: value };
+                    
+                    if (field === 'name' || field === 'productCode') {
+                        const searchKey = field === 'name' ? value : updatedRow.name;
+                        const searchCode = field === 'productCode' ? value : updatedRow.productCode;
+                        
+                        const foundProd = (settings.products || []).find(p => isSameProduct({ name: searchKey, productCode: searchCode, price: updatedRow.price }, p));
+                        if (foundProd) {
+                            if(!updatedRow.productCode) updatedRow.productCode = foundProd.productCode;
+                            if(!updatedRow.price) updatedRow.price = foundProd.price;
+                            if(!updatedRow.name && foundProd.name) updatedRow.name = foundProd.name;
+                            if(!updatedRow.group && foundProd.group) updatedRow.group = foundProd.group;
+                            updatedRow.author = foundProd.author || '';
+                            updatedRow.stock = foundProd.stock || updatedRow.stock;
+                            updatedRow.target = foundProd.target || updatedRow.target;
+                        }
+                    }
+
+                    if (field === 'printer') {
+                        const foundSupp = (settings.suppliers || []).find(s => 
+                            s.supplierName === value && 
+                            isSameProduct({ productCode: updatedRow.productCode, name: updatedRow.name, price: updatedRow.price }, { productCode: s.productCode, name: s.productName, price: s.coverPrice })
+                        );
+                        if (foundSupp) {
+                            updatedRow.cost = parseNum(foundSupp.cost);
+                            updatedRow.produceQty = parseNum(foundSupp.printQty); 
+                        }
+                    }
+
+                    return calculateValues(updatedRow);
+                }));
+            }
+
+            function addEmptyRow() {
+                setData(prev => [...(prev || []), calculateValues({
+                    id: Math.random().toString(36).substr(2, 9),
+                    group: "ทั่วไป", productCode: "", name: "", author: "", price: 0, stock: 0, sold: 0, 
+                    target: 0, discount: 30, cost: 0, produceQty: 0, printer: ""
+                })]);
+            }
+
+            function handleQuickAdd() {
+                const foundProd = (settings.products || []).find(p => p.name === quickAddSearch || p.productCode === quickAddSearch);
+                if (foundProd) {
+                    setData(prev => [...(prev || []), calculateValues({
+                        id: Math.random().toString(36).substr(2, 9),
+                        group: foundProd.group || "ทั่วไป", 
+                        productCode: foundProd.productCode || "", 
+                        name: foundProd.name || "", 
+                        author: foundProd.author || "",
+                        price: foundProd.price || 0, 
+                        stock: foundProd.stock || 0, 
+                        sold: foundProd.sold || 0, 
+                        target: foundProd.target || 0, 
+                        discount: 30, cost: 0, produceQty: 0, printer: ""
+                    })]);
+                    setQuickAddSearch(""); 
+                } else {
+                    alert("ไม่พบสินค้าในฐานข้อมูล กรุณาตรวจสอบรหัสหรือชื่อสินค้าในช่องตั้งค่าก่อนครับ");
+                }
+            }
+
+            function toggleGroupCollapse(groupName) {
+                setCollapsedGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
+            }
+
+            // ==========================================
+            // MEMOIZED & STRICT FILTERED DATA
+            // ==========================================
+            const planTotals = useMemo(() => {
+                let totalItems = (planData || []).length;
+                let totalTarget = 0, totalStock = 0, totalBasicNeed = 0, totalRecommended = 0;
+                (planData || []).forEach(p => {
+                    totalTarget += parseNum(p.target);
+                    totalStock += parseNum(p.stock);
+                    const baseNeed = Math.max(0, parseNum(p.target) - parseNum(p.stock));
+                    totalBasicNeed += baseNeed;
+                    totalRecommended += (baseNeed + Math.ceil(baseNeed * (safetyStockPct / 100)));
+                });
+                return { totalItems, totalTarget, totalStock, totalBasicNeed, totalRecommended };
+            }, [planData, safetyStockPct]);
+
+            const sortedPlanData = useMemo(() => {
+                let items = [...(planData || [])];
+                if (planSortConfig.key !== null) {
+                    items.sort((a, b) => {
+                        let aVal = a[planSortConfig.key], bVal = b[planSortConfig.key];
+                        if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                        if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                        if (aVal < bVal) return planSortConfig.direction === 'asc' ? -1 : 1;
+                        if (aVal > bVal) return planSortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return items;
+            }, [planData, planSortConfig]);
+
+            const filteredPlanData = sortedPlanData.filter(p => {
+                const matchGroup = !searchGroup || String(p.group || "").toLowerCase().includes(String(searchGroup).toLowerCase());
+                const matchType = !searchType || String(p.type || "").toLowerCase().includes(String(searchType).toLowerCase());
+                const matchName = !searchName || String(p.name || "").toLowerCase().includes(String(searchName).toLowerCase());
+                const matchGlobal = !searchTerm || Object.values(p).some(val => val !== null && val !== undefined && String(val).toLowerCase().includes(String(searchTerm).toLowerCase()));
+                return matchGroup && matchType && matchName && matchGlobal;
+            });
+
+            const sortedData = useMemo(() => {
+                let sortableItems = [...(data || [])];
+                if (sortConfig.key !== null) {
+                    sortableItems.sort((a, b) => {
+                        let aVal = a[sortConfig.key], bVal = b[sortConfig.key];
+                        if (typeof aVal === 'string') aVal = aVal.toLowerCase();
+                        if (typeof bVal === 'string') bVal = bVal.toLowerCase();
+                        if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return sortableItems;
+            }, [data, sortConfig]);
+
+            const filteredData = sortedData.filter(item => {
+                if (tableFilter === 'produce' && item.advice !== 'ควรผลิต') return false;
+                const matchGroup = !searchGroup || String(item.group || "").toLowerCase().includes(String(searchGroup).toLowerCase());
+                const matchName = !searchName || String(item.name || "").toLowerCase().includes(String(searchName).toLowerCase());
+                const matchGlobal = !searchTerm || Object.values(item).some(val => val !== null && val !== undefined && String(val).toLowerCase().includes(String(searchTerm).toLowerCase()));
+                return matchGroup && matchName && matchGlobal;
+            });
+
+            const groupedData = useMemo(() => {
+                const groups = {};
+                filteredData.forEach(item => {
+                    const g = item.group || 'ทั่วไป';
+                    if (!groups[g]) groups[g] = [];
+                    groups[g].push(item);
+                });
+                return groups;
+            }, [filteredData]);
+
+            const totals = useMemo(() => {
+                let supplierShares = {};
+                let totalTargetValueCover = 0, totalTargetValueNet = 0; 
+                let totalProduceValue = 0, totalProduceQty = 0, approvedInvestment = 0;
+                let totalVatValue = 0, totalNetValue = 0;
+
+                (data || []).forEach(curr => {
+                    totalTargetValueCover += parseNum(curr.totalSalesCover);
+                    totalTargetValueNet += parseNum(curr.totalSalesNet);
+                    
+                    totalProduceValue += parseNum(curr.bepMoney);
+                    totalVatValue += parseNum(curr.vatAmount);
+                    totalNetValue += parseNum(curr.totalWithVat);
+                    
+                    const qty = parseNum(curr.produceQty);
+                    totalProduceQty += qty;
+                    if (curr.advice === 'ควรผลิต') approvedInvestment += parseNum(curr.bepMoney);
+
+                    const suppName = curr.printer || 'ยังไม่ระบุ Supplier';
+                    if (!supplierShares[suppName]) supplierShares[suppName] = { qty: 0, products: new Set() };
+                    supplierShares[suppName].qty += qty;
+                    if (curr.name) {
+                        supplierShares[suppName].products.add({ name: curr.name, costPct: curr.costPct });
+                    }
+                });
+                return { totalTargetValueCover, totalTargetValueNet, totalProduceValue, totalProduceQty, approvedInvestment, totalVatValue, totalNetValue, supplierShares };
+            }, [data]);
+
+            const profitEvaluation = useMemo(() => {
+                const requiredProfitRatio = 1 + (targetProfitMargin / 100);
+                const targetSalesNet = totals.totalTargetValueNet; 
+                const totalCost = totals.totalProduceValue;
+                const requiredSalesForProfit = totalCost * requiredProfitRatio; 
+                const projectedProfit = targetSalesNet - totalCost;
+                const projectedMargin = targetSalesNet > 0 ? (projectedProfit / targetSalesNet) * 100 : 0;
+                return { requiredSalesForProfit, projectedProfit, projectedMargin, isPassed: targetSalesNet >= requiredSalesForProfit };
+            }, [totals, targetProfitMargin]);
+
+            const groupOptions = useMemo(() => {
+                const dynamicGroups = (settings.products || []).map(p => p.group).filter(Boolean);
+                return Array.from(new Set([...PREDEFINED_GROUPS, ...dynamicGroups]));
+            }, [settings.products]);
+
+            const filteredStep1Products = useMemo(() => {
+                const searchLower = String(newSupp.productName || "").toLowerCase();
+                if(!searchLower) return settings.products || [];
+                return (settings.products || []).filter(p => 
+                    String(p.name || "").toLowerCase().includes(searchLower) || 
+                    (p.productCode && String(p.productCode || "").toLowerCase().includes(searchLower))
+                );
+            }, [newSupp.productName, settings.products]);
+
+            // ==========================================
+            // SETTINGS & DB HANDLERS
+            // ==========================================
+            function handleSaveProduct() {
+                if (!newProd.name) return alert("กรุณาระบุชื่อสินค้า");
+                const existingIdx = (settings.products || []).findIndex(p => isSameProduct(newProd, p));
+
+                let updatedProducts = [...(settings.products || [])];
+                if (existingIdx >= 0) {
+                    if (window.confirm(`พบสินค้า "${newProd.name}" อยู่ในระบบแล้ว ต้องการอัปเดตข้อมูลใช่หรือไม่?`)) {
+                        updatedProducts[existingIdx] = { 
+                            ...updatedProducts[existingIdx], 
+                            ...newProd, 
+                            price: parseNum(newProd.price),
+                            stock: parseNum(newProd.stock) !== 0 ? parseNum(newProd.stock) : updatedProducts[existingIdx].stock,
+                            sold: parseNum(newProd.sold) !== 0 ? parseNum(newProd.sold) : updatedProducts[existingIdx].sold,
+                            target: parseNum(newProd.target) !== 0 ? parseNum(newProd.target) : updatedProducts[existingIdx].target
+                        };
+                    } else return;
+                } else {
+                    updatedProducts.push({ 
+                        ...newProd, 
+                        price: parseNum(newProd.price), 
+                        stock: parseNum(newProd.stock) || 0,
+                        sold: parseNum(newProd.sold) || 0,
+                        target: parseNum(newProd.target) || 0,
+                        id: Date.now() + Math.random() 
+                    });
+                }
+
+                setSettings(prev => ({ ...prev, products: updatedProducts }));
+                setNewProd({ group: "", productCode: "", name: "", author: "", price: "", stock: 0, sold: 0, target: 0 });
+                alert("บันทึกรายการสินค้าเรียบร้อยแล้ว");
+            }
+
+            function getComparisonData() {
+                let matchedSuppliers = settings.suppliers || [];
+                if (compareSearch) {
+                    const searchLower = String(compareSearch || "").toLowerCase();
+                    const baseProd = (settings.products || []).find(p => 
+                        String(p.name || "").toLowerCase().includes(searchLower) || 
+                        (p.productCode && String(p.productCode || "").toLowerCase().includes(searchLower))
+                    );
+                    
+                    matchedSuppliers = (settings.suppliers || []).filter(s =>
+                        (baseProd && s.productCode && s.productCode === baseProd.productCode) ||
+                        (baseProd && s.productName && s.productName === baseProd.name) ||
+                        (s.productCode && String(s.productCode || "").toLowerCase().includes(searchLower)) ||
+                        (s.productName && String(s.productName || "").toLowerCase().includes(searchLower)) ||
+                        (s.supplierName && String(s.supplierName || "").toLowerCase().includes(searchLower))
+                    );
+                }
+
+                let results = matchedSuppliers.map(s => {
+                    const prod = (settings.products || []).find(p => isSameProduct({ productCode: s.productCode, name: s.productName }, p));
+                    const coverPrice = prod ? parseNum(prod.price) : 0;
+                    const discount = parseNum(compareDiscount);
+                    const netPrice = coverPrice - (coverPrice * (discount / 100));
+                    const cost = parseNum(s.cost);
+                    const qty = parseNum(s.printQty);
+                    const totalCost = cost * qty;
+                    const bepQty = netPrice > 0 ? Math.ceil(totalCost / netPrice) : 0;
+                    const costPct = calcCostPct(cost, coverPrice);
+                    
+                    return { 
+                        ...s, coverPrice, cost, qty, totalCost, bepQty, bepMoney: totalCost, costPct, id: s.id, 
+                        baseGroup: prod?.group || "ทั่วไป", productCode: s.productCode || prod?.productCode || "", productName: s.productName || prod?.name || "", author: prod?.author || ""
+                    };
+                });
+
+                const groupedByProd = {};
+                results.forEach(r => {
+                    const key = `${r.productCode}_${r.productName}`;
+                    if (!groupedByProd[key]) groupedByProd[key] = [];
+                    groupedByProd[key].push(r);
+                });
+
+                let finalResults = [];
+                Object.values(groupedByProd).forEach(group => {
+                    const validResults = group.filter(r => r.bepQty > 0 && r.qty >= r.bepQty);
+                    let bestSupplierId = null;
+                    if (validResults.length > 0) {
+                        validResults.sort((a, b) => a.totalCost - b.totalCost);
+                        bestSupplierId = validResults[0].id;
+                    }
+                    group.forEach(r => {
+                        let rec = "";
+                        if (r.qty > 0 && r.bepQty > r.qty) rec = "หา supplier ใหม่"; 
+                        else if (r.id === bestSupplierId) rec = "ควรเลือก"; 
+                        else rec = "ไม่ควรเลือก"; 
+                        finalResults.push({ ...r, recommendation: rec });
+                    });
+                });
+
+                finalResults.sort((a, b) => String(a.productName || "").localeCompare(String(b.productName || ""), 'th'));
+                return finalResults;
+            }
+
+            function toggleBasketItem(suppData) {
+                setSelectedCompareBasket(prev => {
+                    const exists = prev.find(item => item.id === suppData.id);
+                    if (exists) return prev.filter(item => item.id !== suppData.id);
+                    return [...prev, { ...suppData, targetDiscount: compareDiscount }];
+                });
+            }
+
+            function handleAddBasketToTable() {
+                if (selectedCompareBasket.length === 0) return alert("กรุณาเลือกรายการเข้าตะกร้าก่อน");
+
+                runWithLoading("กำลังเพิ่มรายการลงตาราง...", () => {
+                    const newRows = selectedCompareBasket.map(item => {
+                        const dbProd = (settings.products || []).find(p => isSameProduct({ productCode: item.productCode, name: item.productName }, p));
+                        const planItem = (planData || []).find(pl => isSameProduct({ productCode: item.productCode, name: item.productName }, pl));
+                        let produceQtyToUse = item.qty; 
+                        
+                        if (planItem && getRecQty(planItem, safetyStockPct) > 0) {
+                            const recommendedFromPlan = getRecQty(planItem, safetyStockPct);
+                            if (recommendedFromPlan > item.qty) {
+                                produceQtyToUse = recommendedFromPlan;
+                            }
+                        }
+
+                        return calculateValues({
+                            id: Math.random().toString(36).substr(2, 9),
+                            group: item.baseGroup,
+                            productCode: item.productCode,
+                            name: item.productName,
+                            author: item.author,
+                            price: item.coverPrice,
+                            stock: dbProd ? (dbProd.stock || 0) : 0, 
+                            sold: dbProd ? (dbProd.sold || 0) : 0, 
+                            target: dbProd ? (dbProd.target || 0) : 0,
+                            discount: item.targetDiscount,
+                            cost: item.cost,
+                            produceQty: produceQtyToUse,
+                            printer: item.supplierName
+                        });
+                    });
+
+                    setData(prev => [...(prev || []), ...newRows]);
+                    setSelectedCompareBasket([]); 
+                    setShowSettings(false); 
+                });
+            }
+
+            function handleFileUploadDB(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                runWithLoading("กำลังอ่านไฟล์ Excel เข้าสู่ระบบหลังบ้าน...", () => {
+                    const reader = new FileReader();
+                    reader.onload = (evt) => {
+                        try {
+                            const bstr = evt.target.result;
+                            const wb = XLSX.read(bstr, { type: 'binary' });
+                            const ws = wb.Sheets[wb.SheetNames[0]];
+                            const rawData = XLSX.utils.sheet_to_json(ws, { defval: "" });
+
+                            let extractedProducts = [...(settings.products || [])];
+                            const aggregated = {};
+
+                            rawData.forEach(rowObj => {
+                                const rowKeys = Object.keys(rowObj);
+                                const getVal = (keys, excludeKeys = []) => {
+                                    for (let key of keys) {
+                                        const exactMatch = rowKeys.find(k => k.trim() === key);
+                                        if (exactMatch && rowObj[exactMatch] !== undefined && rowObj[exactMatch] !== "") return rowObj[exactMatch];
+                                    }
+                                    for (let key of keys) {
+                                        const includesMatch = rowKeys.find(k => {
+                                            const lowerK = k.trim().toLowerCase();
+                                            const isMatch = lowerK.includes(key.toLowerCase());
+                                            const isExcluded = excludeKeys.some(ex => lowerK.includes(ex.toLowerCase()));
+                                            return isMatch && !isExcluded;
+                                        });
+                                        if (includesMatch && rowObj[includesMatch] !== undefined && rowObj[includesMatch] !== "") return rowObj[includesMatch];
+                                    }
+                                    return null;
+                                };
+
+                                const nameRaw = getVal(['ชื่อหนังสือ', 'รายการสินค้า', 'ชื่อสินค้า', 'สินค้า', 'item name', 'name']);
+                                if (!nameRaw) return;
+
+                                const lowerName = String(nameRaw).toLowerCase().trim();
+                                if (['รวม', 'ยอดรวม', 'total', 'grand total'].includes(lowerName)) return;
+
+                                const codeRaw = getVal(['รหัสสินค้า', 'รหัส', 'code', 'item code']);
+                                const safeCode = codeRaw ? String(codeRaw).trim().toUpperCase() : "";
+                                const safeName = String(nameRaw).trim().toUpperCase();
+                                
+                                const itemPriceRaw = parseNum(getVal(['ราคาปก', 'ราคา/หน่วย', 'ราคา', 'price']));
+                                const safePrice = itemPriceRaw > 0 ? itemPriceRaw : '0';
+                                const key = `${safeCode}_${safeName}_${safePrice}`;
+
+                                const authorRaw = getVal(['ผู้เขียน', 'ผู้แต่ง', 'นักเขียน', 'author']);
+                                const groupRaw = getVal(['กลุ่มสินค้า', 'หมวดหมู่', 'หมวด', 'group']);
+                                
+                                const excludeKeys = uploadMode === 'qty' 
+                                    ? ['บาท', 'เงิน', 'มูลค่า', 'amount', 'value', 'price', 'ยอดเงิน', 'baht']
+                                    : ['จำนวน', 'เล่ม', 'qty', 'quantity', 'ชิ้น', 'หน่วย'];
+
+                                const targetRaw = getVal(['จำนวนเป้าหมาย', 'รวมเป้าขาย', 'เป้าขาย', 'เป้าหมาย', 'เป้า', 'target'], excludeKeys);
+                                const stockRaw = getVal(['จำนวนคงเหลือ', 'คงเหลือทุกคลัง', 'คงเหลือ', 'สต๊อกสินค้า', 'ยอดยกมา', 'stock', 'balance', 'inventory'], excludeKeys);
+                                const soldRaw = getVal(['จำนวนเล่มที่ขาย', 'จำนวนขาย', 'ยอดขายปีล่าสุด', 'ยอดขายปีที่แล้ว', 'ยอดขาย', 'sold', 'sales'], excludeKeys);
+
+                                const targetVal = targetRaw !== null ? parseNum(targetRaw) : null;
+                                const stockVal = stockRaw !== null ? parseNum(stockRaw) : null;
+                                const soldVal = soldRaw !== null ? parseNum(soldRaw) : null;
+
+                                if (!aggregated[key]) {
+                                    aggregated[key] = {
+                                        name: String(nameRaw).trim(), productCode: codeRaw ? String(codeRaw).trim() : "",
+                                        author: authorRaw, group: groupRaw, price: itemPriceRaw,
+                                        stock: stockVal, sold: soldVal, target: targetVal
+                                    };
+                                } else {
+                                    if (stockVal !== null) aggregated[key].stock = (aggregated[key].stock || 0) + stockVal;
+                                    if (soldVal !== null) aggregated[key].sold = (aggregated[key].sold || 0) + soldVal;
+                                    if (targetVal !== null) aggregated[key].target = (aggregated[key].target || 0) + targetVal;
+                                }
+                            });
+
+                            Object.values(aggregated).forEach(item => {
+                                const findIndexWithPrice = (arr) => {
+                                    return arr.findIndex(p => isSameProduct(item, p));
+                                };
+
+                                const dbIdx = findIndexWithPrice(extractedProducts);
+                                const existingDbItem = dbIdx >= 0 ? extractedProducts[dbIdx] : null;
+                                let finalPrice = item.price > 0 ? item.price : (existingDbItem ? existingDbItem.price : 0);
+
+                                const convertToQty = (val) => {
+                                    if (val === null) return null;
+                                    if (uploadMode === 'amount') {
+                                        if (finalPrice > 0) return Math.round(val / finalPrice);
+                                        return 0; 
+                                    }
+                                    return val; 
+                                };
+
+                                const finalTarget = convertToQty(item.target);
+                                const finalStock = convertToQty(item.stock);
+                                const finalSold = convertToQty(item.sold);
+
+                                if (dbIdx < 0) {
+                                    extractedProducts.push({ 
+                                        id: Date.now() + Math.random(), 
+                                        group: item.group || "ทั่วไป", productCode: item.productCode || "", name: item.name, author: item.author || "", 
+                                        price: finalPrice || 0, stock: finalStock || 0, sold: finalSold || 0, target: finalTarget || 0 
+                                    });
+                                } else {
+                                    if (finalPrice > 0) extractedProducts[dbIdx].price = finalPrice;
+                                    if (item.author) extractedProducts[dbIdx].author = item.author;
+                                    if (item.group) extractedProducts[dbIdx].group = item.group;
+                                    if (finalStock !== null) extractedProducts[dbIdx].stock = finalStock;
+                                    if (finalSold !== null) extractedProducts[dbIdx].sold = finalSold;
+                                    if (finalTarget !== null) extractedProducts[dbIdx].target = finalTarget;
+                                    if (item.productCode && !extractedProducts[dbIdx].productCode) extractedProducts[dbIdx].productCode = item.productCode;
+                                }
+                            });
+
+                            setSettings(prev => ({ ...prev, products: extractedProducts }));
+                            setFilesUploaded(prev => ({...prev, db: file.name}));
+                            alert(`โหลดข้อมูลสำเร็จจากไฟล์: ${file.name} \n\n(จัดการรวมยอดซ้ำซ้อน และแปลงเป็นจำนวนเล่มตามการตั้งค่าเรียบร้อย)`);
+                        } catch (err) {
+                            alert("เกิดข้อผิดพลาดในการอ่านไฟล์");
+                        }
+                    };
+                    reader.readAsBinaryString(file);
+                });
+                e.target.value = null;
+            }
+
+            function handleExportPlanExcel() {
+                let itemsToProduce = (planData || []).filter(p => getRecQty(p, safetyStockPct) > 0);
+                if (itemsToProduce.length === 0) return alert("ไม่มีรายการที่ยอดแนะนำเกิน 0 สำหรับส่งออก Excel");
+
+                runWithLoading("กำลังเตรียมไฟล์ Excel แผนการผลิต...", () => {
+                    itemsToProduce.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'));
+
+                    const exportData = itemsToProduce.map((p, index) => {
+                        const baseNeed = Math.max(0, parseNum(p.target) - parseNum(p.stock));
+                        const safetyQty = Math.ceil(baseNeed * (safetyStockPct / 100));
+                        return {
+                            "ลำดับ": index + 1,
+                            "กลุ่มสินค้า": p.group || "-",
+                            "ประเภท": p.type || "-",
+                            "รหัสสินค้า": p.productCode || "-",
+                            "ชื่อสินค้า": p.name,
+                            "ราคา/หน่วย": parseNum(p.price),
+                            "ยอดขายปีล่าสุด": parseNum(p.lastYearSales),
+                            "เป้าขายรวม": parseNum(p.target),
+                            "สต๊อกคงเหลือ": parseNum(p.stock),
+                            "ยอดผลิตพื้นฐาน": baseNeed,
+                            "เผื่อสต๊อก (Safety)": safetyQty,
+                            "ยอดผลิตแนะนำ": baseNeed + safetyQty
+                        };
+                    });
+
+                    const ws = XLSX.utils.json_to_sheet(exportData);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "แผนความต้องการผลิต");
+                    
+                    const { thYear, dStr } = getFormattedDateStrings();
+                    XLSX.writeFile(wb, `${thYear}_Production_Requirement_Plan_${dStr}.xlsx`);
+                });
+            }
+
+            function handleDownloadPlanDocx() {
+                runWithLoading("กำลังเตรียมไฟล์เอกสาร Word...", () => {
+                    const { thYear, dStr } = getFormattedDateStrings();
+                    const fileNameDoc = `${thYear}_Production_Requirement_Plan_${dStr}.doc`;
+                    const htmlContent = generatePlanDocxHtmlString(planData, safetyStockPct);
+                    const uri = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(htmlContent);
+                    const a = document.createElement('a');
+                    a.href = uri;
+                    a.download = fileNameDoc;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setShowPlanDocxPreview(false);
+                });
+            }
+
+            function handleExportPurchasing() {
+                let productionItems = (data || []).filter(r => r.advice === 'ควรผลิต');
+                if (productionItems.length === 0) return alert("ไม่มีรายการที่ระบุการผลิต ('ควรผลิต') สำหรับส่งออก Excel");
+                
+                runWithLoading("กำลังเตรียมไฟล์ Excel...", () => {
+                    // SORTING A-Z, ก-ฮ
+                    productionItems.sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'th'));
+
+                    const exportData = productionItems.map((r, index) => ({
+                        "ลำดับ": index + 1,
+                        "กลุ่มสินค้า": r.group,
+                        "รหัสสินค้า": r.productCode,
+                        "ชื่อหนังสือ": r.name,
+                        "ผู้เขียน": r.author,
+                        "ราคาปก": parseNum(r.price),
+                        "คงเหลือทุกคลัง": parseNum(r.stock),
+                        "จำนวนเล่มที่ขาย": parseNum(r.sold),
+                        "เป้าการขาย": parseNum(r.target),
+                        "ส่วนลดการค้าอ้างอิง(%)": parseNum(r.discount),
+                        "ต้นทุน/ราคาปก (%)": `${r.costPct}%`,
+                        "ต้นทุนการผลิต/เล่ม": parseNum(r.cost),
+                        "จำนวนผลิต": parseNum(r.produceQty),
+                        "คำแนะนำ": r.advice,
+                        "BEP(เล่ม)": parseNum(r.bepQty),
+                        "BEP(ยอดเงิน)": parseNum(r.bepMoney),
+                        "VAT 7%": parseNum(r.vatAmount),
+                        "ยอดรวมสุทธิ (VAT)": parseNum(r.totalWithVat),
+                        "โรงพิมพ์/Supplier": r.printer,
+                        "เป้ายอดขาย (ราคาปก)": parseNum(r.totalSalesCover),
+                        "เป้ายอดขาย (หลังหักส่วนลด)": parseNum(r.totalSalesNet)
+                    }));
+                    const ws = XLSX.utils.json_to_sheet(exportData);
+                    const wb = XLSX.utils.book_new();
+                    XLSX.utils.book_append_sheet(wb, ws, "รายการผลิตที่อนุมัติ");
+                    
+                    const { thYear, dStr } = getFormattedDateStrings();
+                    XLSX.writeFile(wb, `${thYear}_Production_Approval_${dStr}.xlsx`);
+                });
+            }
+
+            function handleDownloadDocx() {
+                runWithLoading("กำลังเตรียมไฟล์เอกสาร Word...", () => {
+                    const { thYear, dStr } = getFormattedDateStrings();
+                    const fileNameDoc = `${thYear}_Production_Approval_${dStr}.doc`;
+                    const assumedDiscount = (data || []).filter(r=>r.advice==='ควรผลิต')[0]?.discount || 30;
+                    const htmlContent = generateDocxHtmlString(data, (data || []).filter(r=>r.advice==='ควรผลิต').length, totals.totalProduceQty, totals.totalProduceValue, totals.totalVatValue, totals.totalNetValue, assumedDiscount);
+                    const uri = 'data:application/vnd.ms-word;charset=utf-8,' + encodeURIComponent(htmlContent);
+                    const a = document.createElement('a');
+                    a.href = uri;
+                    a.download = fileNameDoc;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    setShowDocxPreview(false);
+                });
+            }
+
+            // RENDER (Landing)
+            if (isLanding) {
+                return (
+                    <div className="min-h-screen flex flex-col items-center justify-center p-4 relative bg-gray-50">
+                        <div className="absolute top-4 right-4 text-gray-400 font-bold">{VERSION}</div>
+                        <div className="bg-white p-12 rounded-2xl shadow-xl flex flex-col items-center border-t-4 border-[#002060]">
+                            <h1 className="text-3xl mb-2 text-center text-[#002060]">ระบบบริหารจัดการและวิเคราะห์</h1>
+                            <h2 className="text-xl mb-8 text-center font-normal text-gray-600">Purchase & Production Planning</h2>
+                            
+                            <div className="flex gap-4">
+                                <button onClick={handleLogin} className="bg-[#002060] text-white px-10 py-3 rounded-full shadow-lg hover:bg-blue-800 transition transform hover:scale-105 font-bold text-lg">
+                                    เข้าสู่ระบบ
+                                </button>
+                                <button onClick={loadMockDataForTesting} className="bg-cyan-600 text-white px-8 py-3 rounded-full shadow-lg hover:bg-cyan-700 transition transform hover:scale-105 font-bold text-sm border-2 border-cyan-300">
+                                    🧪 จำลองข้อมูลทดสอบระบบ
+                                </button>
+                            </div>
+                        </div>
+
+                        {showRestoreModal && (
+                            <div className="fixed inset-0 modal-overlay flex items-center justify-center" style={{ zIndex: 70 }}>
+                                <div className="bg-white p-6 rounded-xl shadow-2xl border-2 border-[#002060] w-[450px] text-center">
+                                    <h3 className="text-xl mb-2 text-[#002060] font-bold">📂 พบงานค้างล่าสุดในระบบ</h3>
+                                    <p className="mb-6 text-gray-600">ท่านมีข้อมูลงานที่ทำค้างไว้ ต้องการนำข้อมูลเดิมมาทำงานต่อหรือไม่?</p>
+                                    <div className="flex justify-center gap-4">
+                                        <button onClick={handleRestoreYes} className="bg-green-600 text-white px-6 py-2 font-bold rounded-lg shadow hover:bg-green-700">ใช่, ทำงานต่อ</button>
+                                        <button onClick={handleRestoreNo} className="bg-red-500 text-white px-6 py-2 font-bold rounded-lg shadow hover:bg-red-600">ไม่, เริ่มใหม่ (ล้างข้อมูลเก่าทั้งหมด)</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {isLoading && (
+                            <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[100]">
+                                <div className="bg-white p-8 rounded-2xl shadow-2xl text-center border-t-4 border-[#002060] flex flex-col items-center">
+                                    <div className="w-12 h-12 border-4 border-blue-200 border-t-[#002060] rounded-full animate-spin mb-4"></div>
+                                    <h3 className="text-[#002060] text-lg font-bold mb-2">{loadingText}</h3>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            return (
+                <div className="p-4 flex flex-col h-screen bg-gray-50">
+                    {/* Header Top Bar */}
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-xl m-0 text-[#002060] font-bold">ระบบบริหารและวิเคราะห์การจัดซื้อ</h2>
+                            <span className="text-xs bg-blue-100 text-[#002060] px-2 py-1 rounded-full font-bold">{VERSION}</span>
+                            <span className="text-xs text-gray-600 bg-white px-3 py-1 rounded-full border shadow-sm">📅 วันที่: {CURRENT_DATE}</span>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowHandbook(true)} className="bg-cyan-600 text-white px-4 py-1.5 font-bold rounded shadow-sm hover:bg-cyan-700 transition">📖 คำแนะนำการใช้งาน</button>
+                            <button onClick={() => setShowHistoryModal(true)} className="bg-purple-600 text-white px-4 py-1.5 font-bold rounded shadow-sm hover:bg-purple-700 transition">📂 ประวัติงาน</button>
+                            <button onClick={() => setShowSettings(true)} className="bg-white text-[#002060] px-4 py-1.5 rounded shadow-sm border border-[#002060] font-bold hover:bg-gray-50 transition">⚙️ ตั้งค่าและฐานข้อมูล</button>
+                            <button onClick={handleLogout} className="bg-red-500 text-white px-4 py-1.5 font-bold rounded shadow-sm hover:bg-red-600 transition">🚪 ออกจากระบบ</button>
+                        </div>
+                    </div>
+
+                    {/* File Source Display */}
+                    <div className="flex items-start gap-4 mb-3 p-2 bg-white rounded-lg border shadow-sm text-[11px]">
+                        <div className="font-bold text-[#002060] py-0.5">📂 แหล่งข้อมูลอ้างอิงปัจจุบัน:</div>
+                        <div className="flex flex-wrap gap-2">
+                            <div className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded border border-blue-200">
+                                <b>เป้าขาย (Tab 1):</b> {filesUploaded.target ? filesUploaded.target : <span className="text-gray-400 font-normal">ยังไม่อัปโหลด</span>}
+                            </div>
+                            <div className="bg-orange-50 text-orange-700 px-2 py-0.5 rounded border border-orange-200">
+                                <b>สต๊อกคงเหลือ (Tab 1):</b> {filesUploaded.stock ? filesUploaded.stock : <span className="text-gray-400 font-normal">ยังไม่อัปโหลด</span>}
+                            </div>
+                            <div className="bg-gray-50 text-gray-700 px-2 py-0.5 rounded border border-gray-200">
+                                <b>ฐานข้อมูล (Settings):</b> {filesUploaded.db ? filesUploaded.db : <span className="text-gray-400 font-normal">ยังไม่อัปโหลด</span>}
+                            </div>
+                        </div>
+                        {loadedHistoryName && (
+                            <div className="ml-auto flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-0.5 rounded-full border border-purple-300">
+                                <span className="font-bold">📂 กำลังเปิดดูประวัติงาน: {loadedHistoryName}</span>
+                                <button onClick={exitHistoryMode} className="text-red-500 font-bold hover:text-red-700 bg-white px-2 rounded-full shadow-sm ml-1">✖ กลับโหมดปกติ</button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Main Navigation Tabs */}
+                    <div className="flex bg-white rounded-t-lg shadow-sm border-b-2 border-[#002060]">
+                        <button 
+                            onClick={() => setActiveMainTab('planning')} 
+                            className={`px-6 py-3 font-bold text-sm transition ${activeMainTab === 'planning' ? 'bg-[#002060] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            📋 1. เตรียมสต๊อกและวางแผนผลิต
+                        </button>
+                        <button 
+                            onClick={() => setActiveMainTab('purchasing')} 
+                            className={`px-6 py-3 font-bold text-sm transition ${activeMainTab === 'purchasing' ? 'bg-[#002060] text-white' : 'text-gray-600 hover:bg-gray-100'}`}
+                        >
+                            📊 2. วิเคราะห์จัดซื้อและเปรียบเทียบ
+                        </button>
+                    </div>
+
+                    {/* ========================================================= */}
+                    {/* TAB 1: PLANNING (เตรียมสต๊อกและวางแผนผลิต) */}
+                    {/* ========================================================= */}
+                    {activeMainTab === 'planning' && (
+                        <div className="flex-1 flex flex-col bg-white rounded-b-lg shadow-md border border-t-0 p-4 min-h-0">
+                            
+                            {/* Planning Dashboard Toggle */}
+                            <div className="mb-3">
+                                <div className="flex justify-between items-center bg-planning text-white p-2.5 px-4 cursor-pointer rounded-t-xl shadow-sm" onClick={() => setPlanDashboardExpanded(!planDashboardExpanded)}>
+                                    <h3 className="m-0 font-bold text-white tracking-wide">📊 สรุปข้อมูลสต๊อกและแผนการผลิต {planDashboardExpanded ? '▼' : '▶'}</h3>
+                                </div>
+                                {planDashboardExpanded && (
+                                    <div className="border border-t-0 border-gray-300 p-5 flex flex-col gap-5 bg-white rounded-b-xl shadow-md">
+                                        <div className="grid grid-cols-5 gap-4">
+                                            <div className="bg-gray-50 p-4 border border-gray-200 rounded-xl shadow-sm">
+                                                <div className="text-gray-600 font-bold mb-1">จำนวนรายการทั้งหมด</div>
+                                                <div className="text-2xl font-black text-[#002060]">{formatNum(planTotals.totalItems)} <span className="text-sm">รายการ</span></div>
+                                            </div>
+                                            <div className="bg-blue-50 p-4 border border-blue-100 rounded-xl shadow-sm">
+                                                <div className="text-gray-600 font-bold mb-1">เป้าขายรวม</div>
+                                                <div className="text-2xl font-black text-[#002060]">{formatNum(planTotals.totalTarget)} <span className="text-sm">เล่ม</span></div>
+                                            </div>
+                                            <div className="bg-orange-50 p-4 border border-orange-100 rounded-xl shadow-sm">
+                                                <div className="text-gray-600 font-bold mb-1">สต๊อกคงเหลือรวม</div>
+                                                <div className="text-2xl font-black text-orange-600">{formatNum(planTotals.totalStock)} <span className="text-sm">เล่ม</span></div>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 border border-gray-200 rounded-xl shadow-sm">
+                                                <div className="text-gray-600 font-bold mb-1">ยอดผลิตพื้นฐาน</div>
+                                                <div className="text-2xl font-black text-gray-700">{formatNum(planTotals.totalBasicNeed)} <span className="text-sm">เล่ม</span></div>
+                                            </div>
+                                            <div className="bg-green-50 p-4 border-2 border-planning rounded-xl shadow-sm">
+                                                <div className="font-bold text-planning mb-1">ยอดผลิตแนะนำรวม <span className="text-xs text-gray-500">(เผื่อ {safetyStockPct}%)</span></div>
+                                                <div className="text-2xl font-black text-planning">{formatNum(planTotals.totalRecommended)} <span className="text-sm">เล่ม</span></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-planning/10 p-4 rounded-lg border border-planning/20 mb-4">
+                                <div className="flex justify-between items-start mb-2">
+                                    <h3 className="text-planning font-bold text-lg">การเตรียมความพร้อมและตรวจสอบสต๊อก</h3>
+                                    <div className="flex gap-2">
+                                        <button onClick={handleClearPlanData} className="bg-white/50 text-red-600 border border-red-200 px-3 py-1 rounded shadow-sm font-bold hover:bg-white transition mr-2">🗑️ ล้างข้อมูลตารางนี้ (Tab 1)</button>
+                                        <button onClick={handleExportPlanExcel} className="bg-white text-planning px-4 py-1.5 font-bold rounded shadow-sm border border-planning hover:bg-gray-50 transition">📥 โหลดแผนผลิต (Excel)</button>
+                                        <button onClick={() => setShowPlanDocxPreview(true)} className="bg-yellow-400 text-yellow-900 px-4 py-1.5 font-bold rounded shadow-sm hover:bg-yellow-500 transition">📄 พรีวิวแผนผลิต (.Doc)</button>
+                                    </div>
+                                </div>
+                                <p className="text-gray-700 text-sm mb-3">จับคู่เป้าขายและสต๊อกคงเหลือ เพื่อคำนวณยอดผลิตพื้นฐาน และกำหนด <b>% เผื่อสต๊อก</b> (Safety Stock) เป็น <b>ยอดผลิตแนะนำ</b></p>
+                                
+                                {/* UPLOAD MODE TOGGLE */}
+                                <div className="flex items-center gap-3 bg-white p-2 rounded-lg shadow-sm border border-planning/30 text-[11px] mb-3">
+                                    <span className="font-bold text-[#002060]">⚙️ รูปแบบข้อมูลในไฟล์ Excel ที่จะอัปโหลด:</span>
+                                    <label className="flex items-center gap-1 cursor-pointer">
+                                        <input type="radio" name="uploadMode" checked={uploadMode === 'amount'} onChange={() => setUploadMode('amount')} className="accent-planning" />
+                                        <span className="font-bold text-orange-600">เป็น "ยอดเงิน (บาท)"</span> <span className="text-gray-500">(ระบบจะหารด้วยราคาปกเป็นเล่มให้อัตโนมัติ)</span>
+                                    </label>
+                                    <label className="flex items-center gap-1 cursor-pointer ml-4">
+                                        <input type="radio" name="uploadMode" checked={uploadMode === 'qty'} onChange={() => setUploadMode('qty')} className="accent-planning" />
+                                        <span className="font-bold text-blue-600">เป็น "จำนวน (เล่ม)" อยู่แล้ว</span>
+                                    </label>
+                                </div>
+
+                                <div className="flex gap-4 items-center">
+                                    <label className="bg-white text-planning px-4 py-2 cursor-pointer hover:bg-gray-50 font-bold rounded-lg shadow-sm border-2 border-planning transition flex items-center gap-2">
+                                        📄 1. อัปโหลด "ไฟล์เป้าขาย"
+                                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={(e) => handleUploadPlanFile(e, 'target')} />
+                                    </label>
+                                    <label className="bg-white text-orange-600 px-4 py-2 cursor-pointer hover:bg-gray-50 font-bold rounded-lg shadow-sm border-2 border-orange-500 transition flex items-center gap-2">
+                                        📦 2. อัปโหลด "ไฟล์สต๊อกคงเหลือ"
+                                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={(e) => handleUploadPlanFile(e, 'stock')} />
+                                    </label>
+                                    
+                                    <div className="flex-1"></div>
+
+                                    {/* Safety Stock Control */}
+                                    <div className="flex items-center gap-2 bg-planning/20 px-3 py-1.5 rounded-lg border border-planning/30">
+                                        <span className="font-bold text-planning">เผื่อสต๊อก (%):</span>
+                                        <input 
+                                            type="number" 
+                                            value={safetyStockPct} 
+                                            onChange={e => setSafetyStockPct(parseNum(e.target.value))} 
+                                            className="w-16 text-center font-bold text-planning border-planning/50 bg-white" 
+                                        />
+                                    </div>
+
+                                    <button 
+                                        onClick={sendPlanToPurchasing}
+                                        className="bg-[#002060] text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-blue-800 transition"
+                                    >
+                                        นำรายการที่ต้องผลิต ➔ ส่งไปแท็บวิเคราะห์จัดซื้อ
+                                    </button>
+                                </div>
+                            </div>
+                            
+                            {/* Filter Bar for Tab 1 */}
+                            <div className="flex gap-3 mb-2 bg-blue-50 p-2 rounded-lg border border-blue-100 items-center">
+                                <span className="font-bold text-[#002060] text-xs">🔍 กรองข้อมูลเฉพาะ:</span>
+                                <input type="text" placeholder="กลุ่มสินค้า..." value={searchGroup} onChange={(e) => setSearchGroup(e.target.value)} className={`w-32 bg-white ${searchGroup ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                <input type="text" placeholder="ประเภท..." value={searchType} onChange={(e) => setSearchType(e.target.value)} className={`w-32 bg-white ${searchType ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                <input type="text" placeholder="ชื่อสินค้า..." value={searchName} onChange={(e) => setSearchName(e.target.value)} className={`w-48 bg-white ${searchName ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                <span className="font-bold text-[#002060] text-xs ml-2">รวม:</span>
+                                <input type="text" placeholder="ค้นหาทุกคอลัมน์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-48 bg-white ${searchTerm ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                <button onClick={clearAllFilters} className="text-red-500 font-bold hover:underline text-[11px] ml-2">ล้างตัวกรองทั้งหมด</button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg custom-scrollbar">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-gray-100 sticky top-0 shadow-sm">
+                                        <tr>
+                                            <th onClick={() => handlePlanSort('group')} className="p-3 border-b resizable-th"><div className="resize-wrapper min-w-[80px]"><span>กลุ่มสินค้า</span> {getSortIcon('group', true)}</div></th>
+                                            <th onClick={() => handlePlanSort('productCode')} className="p-3 border-b resizable-th"><div className="resize-wrapper min-w-[60px]"><span>รหัสสินค้า</span> {getSortIcon('productCode', true)}</div></th>
+                                            <th onClick={() => handlePlanSort('name')} className="p-3 border-b resizable-th"><div className="resize-wrapper min-w-[150px]"><span>ชื่อสินค้า</span> {getSortIcon('name', true)}</div></th>
+                                            <th onClick={() => handlePlanSort('price')} className="p-3 border-b text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>ราคา/หน่วย</span> {getSortIcon('price', true)}</div></th>
+                                            <th onClick={() => handlePlanSort('lastYearSales')} className="p-3 border-b text-right resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>ยอดขายปีล่าสุด</span> {getSortIcon('lastYearSales', true)}</div></th>
+                                            <th onClick={() => handlePlanSort('target')} className="p-3 border-b text-right text-[#002060] resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>เป้าขายรวม</span> {getSortIcon('target', true)}</div></th>
+                                            <th onClick={() => handlePlanSort('stock')} className="p-3 border-b text-right text-orange-600 resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>สต๊อกคงเหลือ</span> {getSortIcon('stock', true)}</div></th>
+                                            <th className="p-3 border-b text-right text-gray-500 resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>ยอดผลิตพื้นฐาน</span></div></th>
+                                            <th className="p-3 border-b text-right text-gray-500 resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>เผื่อสต๊อก ({safetyStockPct}%)</span></div></th>
+                                            <th className="p-3 border-b text-right text-planning text-lg resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>ยอดผลิตแนะนำ</span></div></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredPlanData.length === 0 ? (
+                                            <tr><td colSpan="10" className="text-center py-12 text-gray-500 font-bold">ไม่พบข้อมูล หรือ ยังไม่มีการอัปโหลดไฟล์</td></tr>
+                                        ) : filteredPlanData.map((p, idx) => {
+                                            const baseNeed = Math.max(0, p.target - p.stock);
+                                            const safetyQty = Math.ceil(baseNeed * (safetyStockPct / 100));
+                                            const recommendedQty = baseNeed + safetyQty;
+
+                                            return (
+                                            <tr key={idx} className={`border-b hover:bg-gray-50 ${recommendedQty > 0 ? 'bg-green-50/30' : ''}`}>
+                                                <td className="p-2 text-gray-600">{p.group || '-'}</td>
+                                                <td className="p-2 text-gray-600 font-bold">{p.productCode || '-'}</td>
+                                                <td className="p-2 font-bold text-[#002060]" title={p.name}><div className="truncate w-full cursor-pointer hover:bg-blue-100 p-1 rounded transition max-w-[250px]">{p.name}</div></td>
+                                                <td className="p-2 text-right">{formatNum(p.price)}</td>
+                                                <td className="p-2 text-right text-gray-500">{formatNum(p.lastYearSales)}</td>
+                                                <td className="p-2 text-right font-bold text-[#002060]">{formatNum(p.target)}</td>
+                                                <td className="p-2 text-right font-bold text-orange-600">{formatNum(p.stock)}</td>
+                                                <td className="p-2 text-right text-gray-500 font-bold">{formatNum(baseNeed)}</td>
+                                                <td className="p-2 text-right text-gray-500">+{formatNum(safetyQty)}</td>
+                                                <td className={`p-2 text-right font-bold ${recommendedQty > 0 ? 'text-planning text-lg' : 'text-gray-400'}`}>
+                                                    {formatNum(recommendedQty)}
+                                                </td>
+                                            </tr>
+                                        )})}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========================================================= */}
+                    {/* TAB 2: PURCHASING ANALYSIS (วิเคราะห์จัดซื้อหลัก) */}
+                    {/* ========================================================= */}
+                    {activeMainTab === 'purchasing' && (
+                        <div className="flex-1 flex flex-col min-h-0 bg-transparent rounded-b-lg border border-t-0 p-2 border-gray-200">
+                            
+                            {/* Toolbar Dashboard Toggle & Export */}
+                            <div className="flex justify-between items-center bg-white p-2 rounded-t-lg shadow-sm border-b">
+                                <button onClick={() => setDashboardExpanded(!dashboardExpanded)} className="font-bold text-[#002060] px-4">
+                                    📊 สรุปผู้บริหารและประเมินผลกำไร {dashboardExpanded ? '▼' : '▶'}
+                                </button>
+                                <div className="flex gap-2">
+                                    <button onClick={handleClearPurchasingData} className="bg-red-50 text-red-600 border border-red-200 px-3 py-1.5 rounded shadow-sm font-bold hover:bg-red-100 transition mr-2">🗑️ ล้างข้อมูลตารางนี้ (Tab 2)</button>
+                                    <label className="bg-gray-100 text-[#002060] px-4 py-1.5 cursor-pointer hover:bg-gray-200 font-bold rounded shadow-sm border border-[#002060] transition">
+                                        📤 อัปโหลดเข้าฐานข้อมูล (เมนู 1)
+                                        <input type="file" accept=".xlsx, .xls" className="hidden" onChange={handleFileUploadDB} />
+                                    </label>
+                                    <button onClick={handleExportPurchasing} className="bg-[#002060] text-white px-4 py-1.5 font-bold rounded shadow-sm hover:bg-blue-800 transition">📥 โหลด Excel (เฉพาะผลิต)</button>
+                                    <button onClick={() => setShowDocxPreview(true)} className="bg-green-600 text-white px-4 py-1.5 font-bold rounded shadow-sm hover:bg-green-700 transition">📄 พรีวิวรายงาน .Doc</button>
+                                </div>
+                            </div>
+
+                            {/* Dashboard Component inside Tab 2 */}
+                            {dashboardExpanded && (
+                                <div className="border border-t-0 border-gray-300 p-4 flex flex-col gap-4 bg-white shadow-sm mb-3">
+                                    <div className="grid grid-cols-4 gap-4">
+                                        <div className="bg-blue-50 p-4 border border-blue-100 rounded-xl shadow-sm relative overflow-hidden">
+                                            <div className="text-gray-600 font-bold mb-1">มูลค่าเป้าหมาย <span className="text-[#002060]">(ราคาปก)</span></div>
+                                            <div className="text-2xl font-black text-[#002060]">{formatNum(totals.totalTargetValueCover)} <span className="text-sm">฿</span></div>
+                                            <div className="text-gray-500 text-[11px] mt-1 border-t border-blue-100 pt-1">
+                                                เป้าหมาย <span className="text-green-600 font-bold">(หลังหักส่วนลด)</span>: {formatNum(totals.totalTargetValueNet)} ฿
+                                            </div>
+                                        </div>
+                                        <div className="bg-red-50 p-4 border border-red-100 rounded-xl shadow-sm flex flex-col justify-center">
+                                            <div className="text-gray-600 font-bold mb-1">ต้นทุนผลิตรวม <span className="text-highlight">(ก่อน VAT)</span></div>
+                                            <div className="text-2xl font-black text-highlight">{formatNum(totals.totalProduceValue)} <span className="text-sm">฿</span></div>
+                                        </div>
+                                        <div className="bg-blue-50 p-4 border border-blue-100 rounded-xl shadow-sm flex flex-col justify-center">
+                                            <div className="text-gray-600 font-bold mb-1">จำนวนผลิตรวม</div>
+                                            <div className="text-2xl font-black text-[#002060]">{formatNum(totals.totalProduceQty)} <span className="text-sm">เล่ม</span></div>
+                                        </div>
+                                        <div className="bg-yellow-50 p-4 border-2 border-yellow-400 rounded-xl shadow-sm flex flex-col justify-center">
+                                            <div className="font-bold text-yellow-800 mb-1">ยอดลงทุนสุทธิรวม VAT <span className="text-xs text-gray-500">(เฉพาะผลิต)</span></div>
+                                            <div className="text-2xl font-black text-highlight">{formatNum(totals.totalNetValue)} <span className="text-sm">฿</span></div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-5">
+                                        <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm">
+                                            <h4 className="font-bold text-[#002060] mb-3 border-b pb-2">🏭 สัดส่วนการผลิตแยกตาม Supplier</h4>
+                                            <div className="max-h-36 overflow-y-auto pr-2 custom-scrollbar">
+                                                {Object.keys(totals.supplierShares).length === 0 ? (
+                                                    <div className="text-gray-400 text-center py-4">ยังไม่มีข้อมูลการผลิต</div>
+                                                ) : (
+                                                    Object.entries(totals.supplierShares).map(([supp, info], idx) => {
+                                                        const pct = totals.totalProduceQty > 0 ? ((info.qty / totals.totalProduceQty) * 100).toFixed(1) : 0;
+                                                        return (
+                                                            <div key={idx} className="flex flex-col py-2 border-b border-gray-100">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="font-bold text-[#002060] text-[12px]">{supp}</span>
+                                                                    <div className="text-right">
+                                                                        <span className="font-bold text-[#002060]">{formatNum(info.qty)} เล่ม</span>
+                                                                        <span className="text-highlight font-bold text-[10px] bg-red-50 px-1 rounded ml-1">({pct}%)</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="text-[10px] text-gray-500 pl-2">
+                                                                    {Array.from(info.products).map((p, i) => (
+                                                                        <span key={i} className="inline-block bg-gray-100 rounded px-1.5 py-0.5 mr-1 mb-1 border">
+                                                                            {p.name} <span className="text-red-500">({p.costPct}%)</span>
+                                                                        </span>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white p-4 border border-gray-200 rounded-xl shadow-sm flex flex-col justify-between">
+                                            <div className="flex justify-between items-center mb-3 border-b pb-2">
+                                                <div className="flex items-center gap-2">
+                                                    <h4 className="font-bold text-[#002060] m-0">🎯 ประเมินยอดขายตามเป้าหมายกำไร <span className="text-gray-500 text-xs">(อิงราคาสุทธิ)</span></h4>
+                                                    <button onClick={() => setShowProfitInfo(true)} className="w-5 h-5 rounded-full bg-blue-100 text-blue-800 font-bold text-[10px] hover:bg-blue-200">?</button>
+                                                </div>
+                                                <div className="flex items-center gap-2 bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                                                    <span className="font-bold text-[#002060]">เป้ากำไร:</span>
+                                                    <input 
+                                                        type="number" 
+                                                        value={targetProfitMargin} 
+                                                        onChange={e => setTargetProfitMargin(parseNum(e.target.value))} 
+                                                        className="w-12 p-0.5 text-center font-bold bg-white border border-gray-300 rounded"
+                                                    />
+                                                    <span className="font-bold text-[#002060]">%</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col gap-3 mt-1">
+                                                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                                    <span className="text-gray-600 font-bold">ยอดขายสุทธิที่ต้องทำได้ (หลังหักส่วนลด) เพื่อให้ได้กำไร {targetProfitMargin}%:</span>
+                                                    <span className="font-bold text-[#002060] text-lg">{formatNum(profitEvaluation.requiredSalesForProfit)} ฿</span>
+                                                </div>
+                                                <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border border-gray-100">
+                                                    <span className="text-gray-600 font-bold">ประมาณการกำไรสุทธิ จากเป้าขายปัจจุบัน (อิงราคาหลังหักส่วนลด):</span>
+                                                    <span className="font-bold text-highlight text-lg">{formatNum(profitEvaluation.projectedProfit)} ฿ <span className="text-sm bg-red-100 px-1 rounded">({profitEvaluation.projectedMargin.toFixed(1)}%)</span></span>
+                                                </div>
+                                                <div className={`mt-2 text-center font-bold p-3 rounded-lg shadow-sm border ${profitEvaluation.isPassed ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-highlight border-red-200'}`}>
+                                                    สถานะประเมิน: {profitEvaluation.isPassed ? '✅ ยอดขายผ่านเกณฑ์กำไรที่กำหนด' : '⚠️ ยอดขายต่ำกว่าเกณฑ์กำไรที่กำหนด'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl shadow-md border border-gray-200 overflow-hidden">
+                                <div className="flex justify-between items-center bg-gray-50 p-3 border-b">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="flex bg-gray-200 rounded-full p-1 shadow-inner">
+                                            <button onClick={() => setTableFilter('all')} className={`px-4 py-1.5 rounded-full font-bold transition ${tableFilter === 'all' ? 'bg-[#002060] text-white shadow' : 'text-gray-600 hover:bg-gray-300'}`}>แสดงทั้งหมด</button>
+                                            <button onClick={() => setTableFilter('produce')} className={`px-4 py-1.5 rounded-full font-bold transition ${tableFilter === 'produce' ? 'bg-green-600 text-white shadow' : 'text-gray-600 hover:bg-gray-300'}`}>เฉพาะที่มีรายการผลิต</button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="flex gap-2 items-center">
+                                        <span className="font-bold text-[#002060]">➕ เพิ่มจากฐานข้อมูล: </span>
+                                        <input type="text" list="products-list" placeholder="พิมพ์ชื่อ/รหัสสินค้า..." value={quickAddSearch} onChange={(e) => setQuickAddSearch(e.target.value)} className="w-48 p-1.5 border bg-white rounded shadow-sm" />
+                                        <button onClick={handleQuickAdd} className="bg-[#002060] text-white px-4 py-1.5 font-bold rounded shadow hover:bg-blue-800 transition">เพิ่ม</button>
+                                    </div>
+                                </div>
+                                
+                                {/* Advanced Filter Bar for Tab 2 */}
+                                <div className="flex gap-3 mb-1 bg-blue-50 p-2 border-b border-blue-100 items-center">
+                                    <span className="font-bold text-[#002060] text-xs">🔍 กรองข้อมูล:</span>
+                                    <input type="text" placeholder="กลุ่มสินค้า..." value={searchGroup} onChange={(e) => setSearchGroup(e.target.value)} className={`w-32 bg-white ${searchGroup ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                    <input type="text" placeholder="ชื่อ/รหัสสินค้า..." value={searchName} onChange={(e) => setSearchName(e.target.value)} className={`w-48 bg-white ${searchName ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                    <span className="font-bold text-[#002060] text-xs ml-2">รวม:</span>
+                                    <input type="text" placeholder="ค้นหาทุกคอลัมน์..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className={`w-48 bg-white ${searchTerm ? 'border-orange-400 bg-orange-50' : ''}`} />
+                                    <button onClick={clearAllFilters} className="text-red-500 font-bold hover:underline text-[11px] ml-2">ล้างตัวกรองทั้งหมด</button>
+                                </div>
+                                
+                                <datalist id="products-list">{(settings.products || []).map((p, idx) => <option key={idx} value={p.name}>{p.productCode ? `(${p.productCode})` : ''}</option>)}</datalist>
+                                <datalist id="code-list">{(settings.products || []).map((p, idx) => p.productCode && <option key={idx} value={p.productCode} />)}</datalist>
+                                <datalist id="group-options">{(groupOptions || []).map((g, idx) => <option key={idx} value={g} />)}</datalist>
+
+                                <div className="table-container custom-scrollbar">
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th onClick={() => handleSort('group')} className="resizable-th"><div className="resize-wrapper min-w-[80px]"><span>กลุ่มสินค้า</span> {getSortIcon('group', false)}</div></th>
+                                                <th onClick={() => handleSort('productCode')} className="resizable-th"><div className="resize-wrapper min-w-[60px]"><span>รหัสสินค้า</span> {getSortIcon('productCode', false)}</div></th>
+                                                <th onClick={() => handleSort('name')} className="resizable-th"><div className="resize-wrapper min-w-[200px]"><span>ชื่อหนังสือ</span> {getSortIcon('name', false)}</div></th>
+                                                <th onClick={() => handleSort('author')} className="resizable-th"><div className="resize-wrapper min-w-[80px]"><span>ผู้เขียน</span> {getSortIcon('author', false)}</div></th>
+                                                <th onClick={() => handleSort('price')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>ราคาปก</span> {getSortIcon('price', false)}</div></th>
+                                                <th onClick={() => handleSort('stock')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>คงเหลือ</span> {getSortIcon('stock', false)}</div></th>
+                                                <th onClick={() => handleSort('sold')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>จำนวนขาย</span> {getSortIcon('sold', false)}</div></th>
+                                                <th onClick={() => handleSort('target')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>เป้าขาย</span> {getSortIcon('target', false)}</div></th>
+                                                <th onClick={() => handleSort('discount')} className="text-center resizable-th"><div className="resize-wrapper min-w-[60px] justify-center"><span>ลดอ้างอิง(%)</span> {getSortIcon('discount', false)}</div></th>
+                                                <th onClick={() => handleSort('cost')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>ต้นทุนผลิต</span> {getSortIcon('cost', false)}</div></th>
+                                                <th onClick={() => handleSort('produceQty')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>จำนวนผลิต</span> {getSortIcon('produceQty', false)}</div></th>
+                                                <th onClick={() => handleSort('advice')} className="text-center resizable-th"><div className="resize-wrapper min-w-[80px] justify-center"><span>คำแนะนำ</span> {getSortIcon('advice', false)}</div></th>
+                                                <th className="text-right resizable-th"><div className="resize-wrapper min-w-[100px] justify-end"><span>BEP (เล่ม/ยอด)</span></div></th>
+                                                <th onClick={() => handleSort('vatAmount')} className="text-right resizable-th"><div className="resize-wrapper min-w-[60px] justify-end"><span>VAT 7%</span> {getSortIcon('vatAmount', false)}</div></th>
+                                                <th onClick={() => handleSort('totalWithVat')} className="text-right resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>รวมสุทธิ</span> {getSortIcon('totalWithVat', false)}</div></th>
+                                                <th onClick={() => handleSort('printer')} className="resizable-th"><div className="resize-wrapper min-w-[120px]"><span>Supplier</span> {getSortIcon('printer', false)}</div></th>
+                                                <th onClick={() => handleSort('totalSalesCover')} className="text-right resizable-th"><div className="resize-wrapper min-w-[80px] justify-end"><span>เป้ายอดขาย</span> {getSortIcon('totalSalesCover', false)}</div></th>
+                                                <th className="w-10 text-center">ลบ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {Object.keys(groupedData).length === 0 ? (
+                                                <tr><td colSpan="18" className="text-center py-10 text-gray-500 font-bold bg-gray-50">ไม่มีข้อมูลตามเงื่อนไขที่เลือก หรือตารางยังว่างอยู่ (กรุณานำเข้าจากแท็บเตรียมสต๊อก หรือตั้งค่าระบบ)</td></tr>
+                                            ) : Object.entries(groupedData).map(([groupName, items]) => {
+                                                const isCollapsed = collapsedGroups[groupName];
+                                                return (
+                                                    <React.Fragment key={groupName}>
+                                                        <tr className="bg-gray-200 cursor-pointer hover:bg-gray-300 transition" onClick={() => toggleGroupCollapse(groupName)}>
+                                                            <td colSpan="18" className="font-bold text-[#002060] py-2">
+                                                                {isCollapsed ? '▶' : '▼'} 📁 กลุ่มสินค้า: {groupName} <span className="text-gray-600 text-xs ml-2">({items.length} รายการ)</span>
+                                                            </td>
+                                                        </tr>
+                                                        {!isCollapsed && items.map(row => {
+                                                            const matchingSuppliers = (settings.suppliers || []).filter(s => (s.productCode && s.productCode === row.productCode) || (s.productName && s.productName === row.name));
+                                                            return (
+                                                            <tr key={row.id} className="hover:bg-blue-50 transition">
+                                                                <td><input value={row.group} list="group-options" onChange={(e) => handleCellChange(row.id, 'group', e.target.value)} className="w-full" /></td>
+                                                                <td><input value={row.productCode} list="code-list" onChange={(e) => handleCellChange(row.id, 'productCode', e.target.value)} className="font-bold w-full" /></td>
+                                                                <td>
+                                                                    <input 
+                                                                        title={row.name} 
+                                                                        value={row.name} 
+                                                                        list="products-list" 
+                                                                        onChange={(e) => handleCellChange(row.id, 'name', e.target.value)} 
+                                                                        className="font-bold w-full truncate cursor-pointer hover:bg-blue-100" 
+                                                                    />
+                                                                </td>
+                                                                <td><input value={row.author} onChange={(e) => handleCellChange(row.id, 'author', e.target.value)} className="w-full" /></td>
+                                                                <td><input type="number" value={row.price} onChange={(e) => handleCellChange(row.id, 'price', e.target.value)} className="text-right w-full" /></td>
+                                                                <td><input type="number" value={row.stock} onChange={(e) => handleCellChange(row.id, 'stock', e.target.value)} className="text-right bg-blue-50 border-blue-200 font-bold w-full" /></td>
+                                                                <td><input type="number" value={row.sold} onChange={(e) => handleCellChange(row.id, 'sold', e.target.value)} className="text-right bg-green-50 border-green-200 font-bold w-full" /></td>
+                                                                <td><input type="number" value={row.target} onChange={(e) => handleCellChange(row.id, 'target', e.target.value)} className="text-right font-bold text-[#002060] bg-yellow-50 border-yellow-200 w-full" /></td>
+                                                                <td><input type="number" value={row.discount} onChange={(e) => handleCellChange(row.id, 'discount', e.target.value)} className="text-center bg-gray-50 w-full" /></td>
+                                                                <td className="relative">
+                                                                    <input type="number" value={row.cost} onChange={(e) => handleCellChange(row.id, 'cost', e.target.value)} className="text-right w-full" />
+                                                                    <div className="absolute right-2 top-0 text-[9px] text-red-500 font-bold">({row.costPct}%)</div>
+                                                                </td>
+                                                                <td><input type="number" value={row.produceQty} onChange={(e) => handleCellChange(row.id, 'produceQty', e.target.value)} className="text-right font-bold bg-yellow-50 border-yellow-300 w-full" /></td>
+                                                                <td className={`font-bold text-center w-full truncate ${row.advice === 'ควรผลิต' ? 'text-green-600 bg-green-50' : row.advice === 'ไม่ควรผลิต' ? 'text-highlight bg-red-50' : 'text-orange-500'}`}>{row.advice}</td>
+                                                                <td className="bg-gray-50 text-right w-full">{formatNum(row.bepQty)} เล่ม <br/><span className="text-highlight font-bold">({formatNum(row.bepMoney)} ฿)</span></td>
+                                                                <td className="bg-gray-50 text-right text-gray-600 w-full">{formatNum(row.vatAmount)}</td>
+                                                                <td className="bg-gray-100 text-right font-bold text-[#002060] border-l-2 border-gray-300 w-full">{formatNum(row.totalWithVat)}</td>
+                                                                <td>
+                                                                    <select value={row.printer} onChange={(e) => handleCellChange(row.id, 'printer', e.target.value)} className="w-full bg-white shadow-sm truncate border">
+                                                                        <option value="">- เลือกผู้ผลิต -</option>
+                                                                        {matchingSuppliers.length > 0 && (
+                                                                            <optgroup label="✅ ผู้ผลิตที่ประเมินราคาไว้">
+                                                                                {matchingSuppliers.map((s, idx) => <option key={idx} value={s.supplierName}>{s.supplierName} (ทุน: {formatNum(s.cost)}, ผลิต: {formatNum(s.printQty)})</option>)}
+                                                                            </optgroup>
+                                                                        )}
+                                                                        <optgroup label="🖨️ โรงพิมพ์ทั่วไป (ไม่ดึงยอด)">
+                                                                            {(settings.printers || []).map((pr, idx) => <option key={idx} value={pr}>{pr}</option>)}
+                                                                        </optgroup>
+                                                                    </select>
+                                                                </td>
+                                                                <td className="bg-gray-50 font-bold text-right text-[#002060] w-full">{formatNum(row.totalSalesCover)}</td>
+                                                                <td className="text-center"><button onClick={() => setData((data || []).filter(r => r.id !== row.id))} className="text-highlight font-bold bg-red-50 px-3 py-1 rounded hover:bg-red-500 hover:text-white transition">X</button></td>
+                                                            </tr>
+                                                        )})}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                        </tbody>
+                                        <tfoot>
+                                            <tr className="sticky-footer shadow-lg">
+                                                <td colSpan="9" className="text-right text-[#002060] py-3 text-[12px]">รวมทั้งสิ้น:</td>
+                                                <td className="text-[#002060] text-[12px] text-right font-black">{formatNum(totals.totalProduceQty)}</td>
+                                                <td></td>
+                                                <td className="text-highlight text-[12px] text-right font-black">{formatNum(totals.totalProduceValue)} ฿</td>
+                                                <td className="text-gray-600 text-[12px] text-right font-bold">{formatNum(totals.totalVatValue)}</td>
+                                                <td className="text-[#002060] text-[12px] text-right font-black">{formatNum(totals.totalNetValue)} ฿</td>
+                                                <td></td>
+                                                <td className="text-[#002060] text-[12px] text-right font-black">{formatNum(totals.totalTargetValueCover)} ฿</td>
+                                                <td></td>
+                                            </tr>
+                                        </tfoot>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ========================================================= */}
+                    {/* MODALS SECTION */}
+                    {/* ========================================================= */}
+                    
+                    {/* FULL SETTINGS MODAL RESTORED */}
+                    {showSettings && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-50">
+                            <div className="bg-white w-[1000px] max-h-[90vh] flex flex-col shadow-2xl rounded-2xl border-t-4 border-[#002060] overflow-hidden">
+                                <div className="bg-gray-50 text-[#002060] p-4 flex justify-between items-center border-b">
+                                    <h3 className="m-0 font-bold text-lg">⚙️ ฐานข้อมูลระบบและตั้งค่าวิเคราะห์</h3>
+                                    <button onClick={() => setShowSettings(false)} className="text-gray-400 font-bold hover:text-red-500 text-xl">✖</button>
+                                </div>
+                                <div className="flex bg-gray-100 border-b">
+                                    <button onClick={() => setSettingMenu(1)} className={`flex-1 py-3.5 font-bold text-center border-r transition text-[13px] ${settingMenu === 1 ? 'bg-white text-[#002060] border-b-2 border-b-[#002060] shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>1. 🏷️ ฐานข้อมูลสินค้า</button>
+                                    <button onClick={() => setSettingMenu(2)} className={`flex-1 py-3.5 font-bold text-center border-r transition text-[13px] ${settingMenu === 2 ? 'bg-white text-[#002060] border-b-2 border-b-[#002060] shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>2. 📦 วิเคราะห์ Supplier</button>
+                                    <button onClick={() => setSettingMenu(3)} className={`flex-1 py-3.5 font-bold text-center border-r transition text-[13px] ${settingMenu === 3 ? 'bg-white text-[#002060] border-b-2 border-b-[#002060] shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>3. 📊 ตะกร้าส่งลงตาราง</button>
+                                    <button onClick={() => setSettingMenu(4)} className={`flex-1 py-3.5 font-bold text-center transition text-[13px] ${settingMenu === 4 ? 'bg-white text-[#002060] border-b-2 border-b-[#002060] shadow-sm' : 'text-gray-500 hover:bg-gray-200'}`}>4. 📝 ตั้งค่าระบบ / ประวัติ</button>
+                                </div>
+                                <div className="p-6 flex-1 overflow-y-auto flex flex-col gap-5 bg-white custom-scrollbar">
+                                    {/* Menu 1 */}
+                                    {settingMenu === 1 && (
+                                        <div className="flex flex-col gap-4 h-full">
+                                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm flex flex-col gap-3">
+                                                <h4 className="text-[#002060] font-bold">เมนู 1: ฐานข้อมูลสินค้ามาตรฐาน</h4>
+                                                <div className="flex items-center gap-2 bg-white p-2 border rounded">
+                                                    <span className="font-bold text-[11px] text-[#002060]">อัปโหลดไฟล์ Excel เข้าฐาน:</span>
+                                                    <label className="flex items-center gap-1 text-[11px] cursor-pointer"><input type="radio" checked={uploadMode === 'amount'} onChange={() => setUploadMode('amount')} /> <span className="text-orange-600 font-bold">ยอดเงิน (บาท)</span></label>
+                                                    <label className="flex items-center gap-1 text-[11px] cursor-pointer ml-2"><input type="radio" checked={uploadMode === 'qty'} onChange={() => setUploadMode('qty')} /> <span className="text-blue-600 font-bold">จำนวน (เล่ม)</span></label>
+                                                    <label className="bg-[#002060] text-white px-4 py-1.5 text-xs font-bold rounded cursor-pointer ml-auto">📤 โหลดเข้าฐาน <input type="file" className="hidden" onChange={handleFileUploadDB} /></label>
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 flex flex-col bg-white border rounded-xl p-4 shadow-sm min-h-[250px]">
+                                                <div className="flex gap-2 mb-4">
+                                                    <input type="text" placeholder="รหัส" value={newProd.productCode} onChange={e => setNewProd({...newProd, productCode: e.target.value})} className="w-1/6 border rounded p-2" />
+                                                    <input type="text" placeholder="ชื่อหนังสือ" value={newProd.name} onChange={e => setNewProd({...newProd, name: e.target.value})} className="w-2/6 border rounded p-2" />
+                                                    <input type="number" placeholder="ราคาปก" value={newProd.price} onChange={e => setNewProd({...newProd, price: e.target.value})} className="w-1/6 border rounded p-2" />
+                                                    <button className="bg-green-600 text-white px-5 py-2 font-bold rounded shadow hover:bg-green-700 w-1/6" onClick={handleSaveProduct}>บันทึก</button>
+                                                </div>
+                                                <div className="flex-1 overflow-y-auto border rounded bg-gray-50 custom-scrollbar">
+                                                    <table className="w-full text-[12px]"><thead className="bg-gray-200 sticky top-0"><tr><th className="p-2">รหัส</th><th className="p-2">ชื่อ</th><th className="p-2 text-right">ราคาปก</th><th className="p-2 text-right">คงเหลือ</th><th className="p-2 text-right">เป้าขาย</th><th className="p-2 text-center">ลบ</th></tr></thead>
+                                                    <tbody>{(settings.products||[]).slice().reverse().map(p => <tr key={p.id} className="bg-white border-b hover:bg-blue-50"><td className="p-2">{p.productCode || '-'}</td><td className="p-2 font-bold text-[#002060]">{p.name}</td><td className="p-2 font-bold text-highlight text-right">{formatNum(p.price)}</td><td className="p-2 text-blue-600 text-right">{formatNum(p.stock)}</td><td className="p-2 text-green-600 text-right">{formatNum(p.target)}</td><td className="text-center p-2"><button onClick={() => setSettings(pr => ({...pr, products: pr.products.filter(x => x.id !== p.id)}))} className="text-red-500 font-bold bg-red-50 px-2 py-0.5 rounded">X</button></td></tr>)}</tbody></table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Menu 2 */}
+                                    {settingMenu === 2 && (
+                                        <div className="flex flex-col gap-4 h-full">
+                                            <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 shadow-sm flex justify-between items-center"><h4 className="text-[#002060] font-bold">เมนู 2: เพิ่ม Supplier ประเมินราคา</h4></div>
+                                            <div className="flex-1 flex flex-col bg-white border rounded-xl p-4 shadow-sm min-h-[250px]">
+                                                <div className="flex gap-2 mb-4 bg-gray-50 p-3 rounded border relative">
+                                                    <select value={newSupp.supplierName} onChange={e => setNewSupp({...newSupp, supplierName: e.target.value})} className="w-1/5 border rounded p-2 bg-white">
+                                                        <option value="">- Supplier -</option>
+                                                        {(settings.printers||[]).map((pr,i) => <option key={i} value={pr}>{pr}</option>)}
+                                                    </select>
+                                                    
+                                                    <div className="w-2/5 relative">
+                                                        <input type="text" placeholder="🔍 ค้นหาสินค้าจากฐาน..." value={newSupp.productName} 
+                                                            onChange={e => { const f=(settings.products||[]).find(x=>x.name===e.target.value); setNewSupp({...newSupp, productName: e.target.value, productCode: f?f.productCode:''}); }} 
+                                                            onFocus={() => setStep2SearchFocused(true)} onBlur={() => setTimeout(() => setStep2SearchFocused(false), 200)}
+                                                            className="w-full border rounded p-2" 
+                                                        />
+                                                        {step2SearchFocused && filteredStep1Products.length > 0 && (
+                                                            <div className="absolute top-full left-0 w-full bg-white border border-gray-300 shadow-xl z-50 max-h-48 overflow-y-auto mt-1 rounded text-[11px] custom-scrollbar">
+                                                                {filteredStep1Products.map((p, idx) => (
+                                                                    <div key={idx} className="p-2 hover:bg-blue-50 cursor-pointer border-b" onMouseDown={() => setNewSupp({...newSupp, productName: p.name, productCode: p.productCode || ''})}>
+                                                                        <div className="font-bold text-[#002060]">{p.name}</div><div className="text-gray-500 text-[10px]">รหัส: {p.productCode || '-'} | ราคาปก: {formatNum(p.price)}</div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    <input type="number" placeholder="ทุน/เล่ม" value={newSupp.cost} onChange={e => setNewSupp({...newSupp, cost: e.target.value})} className="w-1/5 border rounded p-2 font-bold" />
+                                                    <input type="number" placeholder="MOQ (ขั้นต่ำ)" value={newSupp.printQty} onChange={e => setNewSupp({...newSupp, printQty: e.target.value})} className="w-1/5 border rounded p-2 font-bold" />
+                                                    <button className="bg-blue-600 text-white px-5 py-2 font-bold rounded shadow hover:bg-blue-700" onClick={() => { if(newSupp.supplierName && newSupp.productName) { setSettings(p => ({...p, suppliers: [...(p.suppliers||[]), {...newSupp, id: Date.now()}]})); setNewSupp({ supplierName: "", productCode: "", productName: "", cost: "", printQty: "" }); } }}>เพิ่ม</button>
+                                                </div>
+                                                <datalist id="db-products">{(settings.products||[]).map((p,i)=><option key={i} value={p.name} />)}</datalist>
+                                                <div className="flex-1 overflow-y-auto border rounded bg-gray-50 custom-scrollbar">
+                                                    <table className="w-full text-[12px]"><thead className="bg-gray-200 sticky top-0"><tr><th className="p-2">Supplier</th><th className="p-2">รหัสสินค้า</th><th className="p-2">สินค้า</th><th className="p-2 text-right">ราคาปก</th><th className="p-2 text-right">ทุน</th><th className="p-2 text-right">MOQ</th><th className="p-2 text-center">ลบ</th></tr></thead>
+                                                    <tbody>{(settings.suppliers||[]).slice().reverse().map(s => {
+                                                        const prodPrice = (settings.products || []).find(p => (p.productCode && s.productCode && p.productCode === s.productCode) || p.name === s.productName)?.price || 0;
+                                                        const sPct = calcCostPct(parseNum(s.cost), parseNum(prodPrice));
+                                                        return <tr key={s.id} className="bg-white border-b hover:bg-blue-50"><td className="p-2 font-bold text-[#002060]">{s.supplierName}</td><td className="p-2">{s.productCode || '-'}</td><td className="p-2">{s.productName}</td><td className="p-2 text-right font-bold text-[#002060]">{formatNum(prodPrice)}</td><td className="p-2 text-highlight font-bold text-right">{formatNum(s.cost)} <span className="text-[10px] text-gray-500">({sPct}%)</span></td><td className="p-2 text-right">{formatNum(s.printQty)}</td><td className="text-center p-2"><button onClick={() => setSettings(pr => ({...pr, suppliers: pr.suppliers.filter(x => x.id !== s.id)}))} className="text-red-400 font-bold bg-red-50 px-2 py-0.5 rounded">X</button></td></tr>;
+                                                    })}</tbody></table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Menu 3 */}
+                                    {settingMenu === 3 && (
+                                        <div className="flex flex-col gap-4 h-full">
+                                            <div className="bg-blue-50 p-4 rounded-xl border flex justify-between items-center"><h4 className="text-[#002060] font-bold">เมนู 3: เลือก Supplier ที่ถูกที่สุดลงตาราง</h4></div>
+                                            <div className="flex gap-3 mb-1"><input type="text" placeholder="🔍 ค้นหาสินค้า..." value={compareSearch} onChange={(e) => setCompareSearch(e.target.value)} className="w-full border rounded p-2" /></div>
+                                            <div className="overflow-y-auto border rounded bg-gray-50 h-48 custom-scrollbar">
+                                                <table className="w-full text-[12px]"><thead className="bg-gray-200 sticky top-0"><tr><th>เลือก</th><th>Supplier</th><th>รหัสสินค้า</th><th>สินค้า</th><th className="text-right">ราคาปก</th><th className="text-right">ทุน</th><th className="text-right">MOQ</th><th>แนะนำ</th></tr></thead>
+                                                <tbody>{getComparisonData().map(s => { const isCh = selectedCompareBasket.some(i=>i.id===s.id); return <tr key={s.id} className="border-b text-center"><td className="p-2"><input type="checkbox" checked={isCh} onChange={()=>toggleBasketItem(s)} className="w-4 h-4 cursor-pointer" /></td><td className="font-bold">{s.supplierName}</td><td>{s.productCode || '-'}</td><td>{s.productName}</td><td className="text-right font-bold text-[#002060]">{formatNum(s.coverPrice)}</td><td className="text-red-500 font-bold text-right">{formatNum(s.cost)}</td><td className="text-right">{formatNum(s.qty)}</td><td className={s.recommendation === 'ควรเลือก' ? 'text-green-600 font-bold' : ''}>{s.recommendation}</td></tr>; })}</tbody></table>
+                                            </div>
+                                            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4 shadow-sm relative">
+                                                <div className="absolute top-[-12px] left-4 bg-yellow-400 text-yellow-900 px-3 py-0.5 rounded-full font-bold text-xs">🛒 ตะกร้าเตรียมลงตาราง ({selectedCompareBasket.length})</div>
+                                                <div className="flex justify-end mb-2 mt-1"><button onClick={() => setSelectedCompareBasket([])} className="text-red-500 text-xs font-bold underline">ล้างตะกร้าทั้งหมด</button></div>
+                                                <div className="max-h-24 overflow-y-auto bg-white rounded border border-yellow-200 custom-scrollbar">
+                                                    {selectedCompareBasket.length === 0 ? (
+                                                        <div className="text-gray-400 text-center py-4 text-xs font-bold">ยังไม่มีรายการที่ถูกเลือก</div>
+                                                    ) : (
+                                                        <table className="w-full text-[11px]">
+                                                            <tbody>
+                                                                {selectedCompareBasket.map((item, idx) => (
+                                                                    <tr key={idx} className="border-b border-gray-100 hover:bg-yellow-50">
+                                                                        <td className="p-1.5 pl-3"><b>{item.supplierName}</b></td>
+                                                                        <td className="p-1.5 text-gray-500">{item.productCode || '-'}</td>
+                                                                        <td className="p-1.5">{item.productName}</td>
+                                                                        <td className="p-1.5 font-bold text-[#002060]">{formatNum(item.coverPrice)}</td>
+                                                                        <td className="p-1.5 text-highlight font-bold">ทุน: {formatNum(item.cost)}</td>
+                                                                        <td className="p-1.5 font-bold">พิมพ์: {formatNum(item.qty)}</td>
+                                                                        <td className="text-center p-1.5"><button onClick={() => toggleBasketItem(item)} className="text-red-500 font-bold hover:bg-red-100 px-2 py-0.5 rounded">X</button></td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
+                                                    )}
+                                                </div>
+                                                <button onClick={handleAddBasketToTable} disabled={selectedCompareBasket.length === 0} className={`w-full py-2 mt-2 rounded-full font-bold shadow-md transition ${selectedCompareBasket.length > 0 ? 'bg-green-600 text-white' : 'bg-gray-300 text-gray-500'}`}>📥 ส่งข้อมูลในตะกร้าลงตารางหลัก</button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {/* Menu 4 */}
+                                    {settingMenu === 4 && (
+                                        <div className="flex flex-col gap-4 h-full">
+                                            <div className="bg-white p-4 border rounded shadow-sm">
+                                                <h4 className="font-bold mb-2">เพิ่มชื่อ Supplier ลงระบบ (สำหรับ Dropdown)</h4>
+                                                <div className="flex gap-2"><input type="text" value={newPrinter} onChange={e=>setNewPrinter(e.target.value)} className="border p-2 flex-1" placeholder="ชื่อโรงพิมพ์ใหม่..." /><button onClick={() => { if(newPrinter && !(settings.printers||[]).includes(newPrinter)) { setSettings(p => ({...p, printers: [...(p.printers||[]), newPrinter]})); setNewPrinter(""); } }} className="bg-[#002060] text-white px-6 rounded font-bold">เพิ่ม</button></div>
+                                                <div className="mt-4 flex gap-2 flex-wrap">{(settings.printers||[]).map((pr, i) => <div key={i} className="bg-gray-100 border px-3 py-1 rounded-full text-xs flex gap-2 items-center">{pr} <button onClick={() => setSettings(p => ({...p, printers: p.printers.filter(x => x !== pr)}))} className="text-red-500 font-bold">X</button></div>)}</div>
+                                            </div>
+                                            <div className="bg-gray-50 p-4 border rounded shadow-sm flex-1 overflow-y-auto custom-scrollbar">
+                                                <h4 className="font-bold mb-2 text-[#002060]">ประวัติการอัปเดตระบบ (Changelog)</h4>
+                                                {CHANGELOG.map((c, i) => <div key={i} className="mb-2 text-xs"><b className="text-[#002060] bg-blue-100 px-2 py-0.5 rounded">v{c.ver}</b> {c.detail}</div>)}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Report Modals */}
+                    {showPlanDocxPreview && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[80]">
+                            <div className="bg-white w-[1000px] max-h-[95vh] flex flex-col shadow-2xl rounded-2xl border-t-4 border-planning overflow-hidden">
+                                <div className="bg-gray-50 text-planning p-4 flex justify-between border-b"><h3 className="font-bold text-lg">📄 Preview: แผนความต้องการผลิต (Tab 1)</h3><button onClick={() => setShowPlanDocxPreview(false)} className="font-bold text-red-500 text-xl">✖</button></div>
+                                <div className="p-6 flex-1 overflow-y-auto bg-gray-200 flex justify-center custom-scrollbar"><div className="bg-white shadow-2xl p-12 docx-preview-content w-[210mm] min-h-[297mm] transform scale-[0.8] origin-top mb-[-40mm]" dangerouslySetInnerHTML={{ __html: generatePlanDocxHtmlString(planData, safetyStockPct) }}></div></div>
+                                <div className="p-4 bg-white border-t flex justify-end gap-3"><button onClick={() => setShowPlanDocxPreview(false)} className="bg-gray-200 px-6 py-2 rounded-full font-bold">ปิด</button><button onClick={handleDownloadPlanDocx} className="bg-planning text-white px-8 py-2 rounded-full font-bold shadow">ดาวน์โหลด .Doc</button></div>
+                            </div>
+                        </div>
+                    )}
+                    {showDocxPreview && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[80]">
+                            <div className="bg-white w-[1000px] max-h-[95vh] flex flex-col shadow-2xl rounded-2xl border-t-4 border-[#002060] overflow-hidden">
+                                <div className="bg-gray-50 text-[#002060] p-4 flex justify-between border-b"><h3 className="font-bold text-lg">📄 Preview: ขออนุมัติผลิต (Tab 2)</h3><button onClick={() => setShowDocxPreview(false)} className="font-bold text-red-500 text-xl">✖</button></div>
+                                <div className="p-6 flex-1 overflow-y-auto bg-gray-200 flex justify-center custom-scrollbar"><div className="bg-white shadow-2xl p-12 docx-preview-content w-[210mm] min-h-[297mm] transform scale-[0.8] origin-top mb-[-40mm]" dangerouslySetInnerHTML={{ __html: generateDocxHtmlString(data, (data||[]).filter(r=>r.advice==='ควรผลิต').length, totals.totalProduceQty, totals.totalProduceValue, totals.totalVatValue, totals.totalNetValue, 30) }}></div></div>
+                                <div className="p-4 bg-white border-t flex justify-end gap-3"><button onClick={() => setShowDocxPreview(false)} className="bg-gray-200 px-6 py-2 rounded-full font-bold">ปิด</button><button onClick={handleDownloadDocx} className="bg-[#002060] text-white px-8 py-2 rounded-full font-bold shadow">ดาวน์โหลด .Doc</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Manuals & Guides */}
+                    {showHandbook && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[90]">
+                            <div className="bg-white w-[800px] max-h-[90vh] flex flex-col shadow-2xl rounded-2xl border-t-4 border-cyan-600 overflow-hidden">
+                                <div className="bg-gray-50 p-4 flex justify-between border-b"><h3 className="font-bold text-lg text-[#002060]">📖 คู่มือการใช้งานระบบ</h3><button onClick={() => setShowHandbook(false)} className="text-red-500 font-bold">✖</button></div>
+                                <div className="p-6 overflow-y-auto text-sm text-gray-700 leading-relaxed"><p><b>1. Tab 1:</b> อัปโหลดไฟล์ Excel ยอดเป้าและสต๊อก (เลือกว่าไฟล์ที่ได้มาเป็นยอดเงิน หรือจำนวนเล่ม) ระบบจะคำนวณและรวมยอดที่ชื่อเหมือนกันให้อัตโนมัติ</p><p><b>2. Tab 2:</b> ส่งยอดแนะนำมาวิเคราะห์ต้นทุนเทียบ Supplier ระบบจะคำนวณจุดคุ้มทุนให้อัตโนมัติ</p><p><b>3. เมนูตั้งค่า (⚙️):</b> ใช้สำหรับอัปโหลดข้อมูลสินค้าและใส่ต้นทุนของ Supplier ล่วงหน้า และให้ระบบเทียบหาเจ้าที่ถูกที่สุดเพื่อโยนลงตาราง</p></div>
+                                <div className="p-4 border-t flex justify-end"><button onClick={() => setShowHandbook(false)} className="bg-[#002060] text-white px-6 py-2 rounded-lg font-bold">ปิดคู่มือ</button></div>
+                            </div>
+                        </div>
+                    )}
+                    {showHistoryModal && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[100]">
+                            <div className="bg-white w-[650px] shadow-2xl rounded-2xl border-t-4 border-purple-600 overflow-hidden">
+                                <div className="bg-gray-50 p-4 flex justify-between border-b"><h3 className="font-bold text-lg text-[#002060]">📂 ประวัติงาน (History)</h3><button onClick={() => setShowHistoryModal(false)} className="text-red-500 font-bold">✖</button></div>
+                                <div className="p-6 flex flex-col gap-4">
+                                    <div className="flex gap-2"><input type="text" placeholder="ตั้งชื่อประวัติเพื่อบันทึกงาน ณ ปัจจุบัน..." value={newHistoryName} onChange={e=>setNewHistoryName(e.target.value)} className="border p-2 flex-1" /><button onClick={saveHistory} className="bg-purple-600 text-white px-6 rounded font-bold">บันทึก</button></div>
+                                    <div className="max-h-64 overflow-y-auto border rounded bg-gray-50 custom-scrollbar"><table className="w-full text-sm"><thead className="bg-gray-200 sticky top-0"><tr><th className="p-2">ชื่อแฟ้มอ้างอิง</th><th className="p-2">เวลาที่บันทึก</th><th className="text-center p-2">จัดการ</th></tr></thead><tbody>{(historyList||[]).slice().reverse().map(h => <tr key={h.id} className="border-b bg-white"><td className="p-2 font-bold text-[#002060]">{h.name}</td><td className="p-2 text-gray-600">{h.date}</td><td className="text-center p-2"><button onClick={() => loadHistory(h)} className="bg-blue-600 text-white px-3 py-1 rounded shadow mr-2 font-bold">Load</button><button onClick={() => deleteHistory(h.id)} className="bg-red-100 text-red-600 px-3 py-1 rounded font-bold">ลบ</button></td></tr>)}</tbody></table></div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    {showProfitInfo && (
+                        <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[90]">
+                            <div className="bg-white p-6 rounded-2xl shadow-2xl border-t-4 border-blue-500 w-[500px]">
+                                <h3 className="text-[#002060] text-lg font-bold mb-3">🎯 หลักการคำนวณเป้าหมายกำไร</h3>
+                                <div className="text-gray-600 text-sm mb-4">
+                                    <p className="mb-2">ระบบประเมินยอดขายตามเป้าหมาย โดยอ้างอิงจาก <b>ราคาหลังหักส่วนลด (Net Price)</b>:</p>
+                                    <div className="bg-blue-50 p-3 rounded border border-blue-100 text-center font-bold text-[#002060] mb-2 text-[12px]">ยอดขายสุทธิที่ต้องทำได้ = ต้นทุนผลิตรวม × [1 + (เป้ากำไร % / 100)]</div>
+                                </div>
+                                <div className="text-right"><button onClick={() => setShowProfitInfo(false)} className="bg-blue-500 text-white px-6 py-2 font-bold rounded-lg shadow hover:bg-blue-600">เข้าใจแล้ว</button></div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {isLoading && <div className="fixed inset-0 modal-overlay flex items-center justify-center z-[100]"><div className="bg-white p-8 rounded-2xl shadow-2xl border-t-4 border-[#002060] text-center"><div className="w-12 h-12 border-4 border-blue-200 border-t-[#002060] rounded-full animate-spin mb-4 mx-auto"></div><h3 className="text-[#002060] text-lg font-bold">{loadingText}</h3></div></div>}
+                </div>
+            );
+        }
+
+        // ==========================================
+        // 3. RENDER (Wrapped in Error Boundary)
+        // ==========================================
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<ErrorBoundary><App /></ErrorBoundary>);
+    </script>
+</body>
+</html>
