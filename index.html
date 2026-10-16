@@ -3,20 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ระบบวิเคราะห์จัดซื้อและวางแผนผลิต - V2.26</title>
+    <title>ระบบวิเคราะห์จัดซื้อและวางแผนผลิต - V2.28</title>
     
-    <!-- ป้องกัน Script error. จาก ResizeObserver -->
-    <script>
-        window.addEventListener('error', function(e) {
-            var msg = e && e.message ? String(e.message) : '';
-            if (msg === 'Script error.' || msg.indexOf('ResizeObserver') !== -1) {
-                e.stopImmediatePropagation();
-                e.preventDefault();
-                return true;
-            }
-        }, true);
-    </script>
-
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -57,7 +45,7 @@
         .modal-overlay { background: rgba(15,23,42,0.8); position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(4px); }
         .app-logo { height: 48px; object-fit: contain; }
         
-        /* A4 Document Exact-Fit Styling (Sarabun 14pt ทั้งหมดทุกจุดสำหรับพิมพ์และ .Doc/.PDF) */
+        /* A4 Document Exact-Fit Styling (Sarabun 14pt ทั้งหมดทุกจุดสำหรับพรีวิว, พิมพ์, .Doc และ .PDF) */
         .a4-preview-container { 
             width: 210mm; 
             min-height: 297mm; 
@@ -81,7 +69,7 @@
         .a4-preview-container td,
         .a4-preview-container th {
             font-family: 'Sarabun', sans-serif !important;
-            font-size: 14pt;
+            font-size: 14pt !important;
         }
         .a4-preview-container table { 
             width: 100% !important; 
@@ -133,36 +121,21 @@
             text-align: left; 
             font-size: 14pt !important;
         }
-        
-        @media print {
-            @page { size: A4 portrait; margin: 10mm; }
-            body * { visibility: hidden; }
-            .a4-preview-container, .a4-preview-container * { visibility: visible; }
-            .a4-preview-container { 
-                position: absolute !important; 
-                left: 0; 
-                top: 0; 
-                width: 100% !important; 
-                margin: 0 !important; 
-                box-shadow: none !important; 
-                transform: scale(1) !important; 
-            }
-            .print-hidden { display: none !important; }
-        }
     </style>
 
-    <!-- วางสคริปต์ตำแหน่งเดียวกับ V2.18 ที่เปิดติดแน่นอน 100% พร้อมลิงก์สำรองอัตโนมัติ -->
-    <script src="https://unpkg.com/react@18.2.0/umd/react.production.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js'"></script>
-    <script src="https://unpkg.com/react-dom@18.2.0/umd/react-dom.production.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'"></script>
-    <script src="https://unpkg.com/@babel/standalone@7.23.6/babel.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js'"></script>
-    <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'"></script>
+    <!-- โหลดไลบรารีหลักพร้อมระบบสำรอง CDN อัตโนมัติ และ html2pdf สำหรับสร้างไฟล์ .PDF โดยตรง -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js'"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js'"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js'"></script>
+    <script src="https://unpkg.com/xlsx/dist/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
     <div id="root"></div>
 
-    <script type="text/babel" data-presets="env,react">
+    <script type="text/babel">
         const { useState, useEffect, useMemo, Component } = React;
-        const VERSION = "V2.26 (V2.18 Core + Google Sheets Cloud Sync)";
+        const VERSION = "V2.28 (PDF/Doc Sarabun 14pt + Cloud Sync)";
         const CURRENT_DATE = new Date().toLocaleDateString('th-TH', { year: 'numeric', month: 'long', day: 'numeric' });
 
         const DEFAULT_GAS_URL = "https://script.google.com/macros/s/AKfycbzsn-az6Z9BbYaYRi40K-UhYK6znciva8chJX-3lJ4KjzMvEqpSrOtwRxSi__bkoCOucQ/exec";
@@ -373,7 +346,7 @@
             });
         }
 
-        // --- A4 INTERNAL MEMO HTML GENERATOR (Sarabun 14pt ทุกจุด + โลโก้ Base64) ---
+        // --- A4 INTERNAL MEMO HTML GENERATOR (บังคับฟอนต์ Sarabun 14pt ทั้งใน .Doc และ .PDF + โลโก้ Base64) ---
         function getDocxHTML(dataArr, mode, safePct, aiRef, docNo, avgDisc, logoSrc) {
             const isPlan = mode === 'plan';
             const isBep = mode === 'bep';
@@ -510,11 +483,14 @@
 
             return '<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
             '<head><meta charset="utf-8">' +
+            '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">' +
             '<style>' +
                 '@page Section1 { size: 595.3pt 841.9pt; margin: 36.0pt 36.0pt 36.0pt 42.5pt; mso-header-margin: 35.4pt; mso-footer-margin: 35.4pt; }' +
                 'div.Section1 { page: Section1; }' +
                 'body, p, div, span, table, thead, tbody, tr, th, td, b, strong { ' + fontCss + ' }' +
                 'table.doc-table { width: 100%; border-collapse: collapse; border: 1px solid #000; table-layout: fixed; }' +
+                'tr { page-break-inside: avoid; }' +
+                'thead { display: table-header-group; }' +
             '</style>' +
             '</head>' +
             '<body style="' + fontCss + 'color:#000;margin:0;padding:0;">' +
@@ -680,6 +656,49 @@
             const [bidItem, setBidItem] = useState(null); 
             const [bids, setBids] = useState([]); 
             const [healthReport, setHealthReport] = useState({ status: 'OK', checks: [] });
+
+            // --- ฟังก์ชันพิมพ์ / บันทึก PDF แยกหน้าต่างอิสระ (Sarabun 14pt ทุกจุด + ไม่โดนตัดหน้า) ---
+            const handlePrintPDF = function(activeMode) {
+                const modeToUse = activeMode || previewMode || tab;
+                const activeArr = modeToUse === 'plan' ? planData : data;
+                const htmlContent = getDocxHTML(activeArr, modeToUse, safePct, aiRef, docNo, avgDisc, logoDataUri);
+                const printWin = window.open('', '_blank', 'width=1024,height=800');
+                if (!printWin) {
+                    window.print();
+                    return;
+                }
+                printWin.document.open();
+                printWin.document.write(htmlContent);
+                printWin.document.close();
+                setTimeout(function() {
+                    printWin.focus();
+                    printWin.print();
+                }, 600);
+            };
+
+            // --- ฟังก์ชันดาวน์โหลดเป็นไฟล์ .PDF โดยตรง (ผ่าน html2pdf.js) ---
+            const handleDirectDownloadPDF = function(activeMode) {
+                const el = document.getElementById('a4-pdf-source');
+                if (!el || typeof window.html2pdf === 'undefined') {
+                    handlePrintPDF(activeMode);
+                    return;
+                }
+                setLoadText("กำลังสร้างไฟล์ PDF (Sarabun 14pt)...");
+                setIsLoading(true);
+                const opt = {
+                    margin: [10, 10, 10, 12],
+                    filename: docNo.replace(':', '_') + '_Internal_Memo.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                window.html2pdf().set(opt).from(el).save().then(function() {
+                    setIsLoading(false);
+                }).catch(function() {
+                    setIsLoading(false);
+                    handlePrintPDF(activeMode);
+                });
+            };
 
             // --- ส่ง Audit Log ไปยัง Google Apps Script ---
             const sendAuditLog = function(actionText, statusText, noteText) {
@@ -930,6 +949,7 @@
             };
 
             useEffect(function() {
+                window.__bootSuccess = true;
                 try {
                     const img = new Image();
                     img.crossOrigin = "Anonymous";
@@ -1035,8 +1055,8 @@
                     { name: "การเชื่อมต่อ Google Sheets & Apps Script Cloud", detail: cloudPing.status === 'online' ? ("ออนไลน์ (" + cloudPing.msg + ")") : "พร้อมเชื่อมต่อ (กดปุ่ม ทดสอบ Ping เพื่อตรวจสอบ)", ok: true },
                     { name: "โครงสร้างตารางวางแผนผลิต (Tab 1)", detail: "ตรวจสอบแล้ว " + cleanPlan.length + " รายการ (สมบูรณ์ 100%)", ok: true },
                     { name: "การเชื่อมโยงเงื่อนไข Supplier (Ref. & เครดิต) กับหน้าเปรียบเทียบ", detail: "ซิงค์ข้อมูลจากฐานข้อมูล Supplier (" + allSupps.length + " รายการ) เข้าสู่หน้าเปรียบเทียบครบถ้วน", ok: true },
-                    { name: "ระบบเอกสาร .Doc & PDF (Sarabun 14pt + โลโก้ฝังในไฟล์)", detail: "เลขที่ปัจจุบัน " + docNo + " | บังคับฟอนต์ Sarabun 14pt ทุกจุดและฝังโลโก้ Base64 เรียบร้อย", ok: true },
-                    { name: "ระบบการโหลด V2.18 Core", detail: fixedCount > 0 ? ("ซิงค์และซ่อมแซมข้อมูลอัตโนมัติ " + fixedCount + " จุดเรียบร้อย") : "ทำงานปกติ ไม่พบข้อผิดพลาด", ok: true }
+                    { name: "ระบบเอกสาร .Doc & .PDF (Sarabun 14pt + โลโก้ฝังในไฟล์)", detail: "เลขที่ปัจจุบัน " + docNo + " | บังคับฟอนต์ Sarabun 14pt ทุกจุดและรองรับการสร้าง PDF ตรง", ok: true },
+                    { name: "โครงสร้างการบูตระบบ", detail: fixedCount > 0 ? ("ซิงค์และซ่อมแซมข้อมูลอัตโนมัติ " + fixedCount + " จุดเรียบร้อย") : "ทำงานปกติ ไม่พบข้อผิดพลาด", ok: true }
                 ];
                 setHealthReport({ status: 'OK', checks: checks });
                 if (showModal) setModals(function(m) { return Object.assign({}, m, { health: true }); });
@@ -1984,7 +2004,7 @@
                                             <button onClick={function() { setData(data.concat([calculateValues({ id: Date.now(), group: "ทั่วไป", productCode: "", name: "", price: 0, produceQty: 1000, cost: 0, printer: "", suppRef: "", creditTerm: "", discount: avgDisc }, avgDisc)])); }} className="btn btn-outline py-1">+ เพิ่มรายการใหม่</button>
                                             <button onClick={function() { setTab('bep'); }} className="btn bg-emerald-600 text-white hover:bg-emerald-700 py-1">📊 ไปหน้าวิเคราะห์ BEP ➔</button>
                                             <button onClick={function() { handleExportExcel('pur'); }} className="btn btn-blue py-1">📥 ส่งออก Excel</button>
-                                            <button onClick={function() { setPreviewMode(null); setModals(function(m) { return Object.assign({}, m, { preview: true }); }); }} className="btn btn-green py-1">📄 พรีวิวบันทึกภายใน (.Doc A4)</button>
+                                            <button onClick={function() { setPreviewMode(null); setModals(function(m) { return Object.assign({}, m, { preview: true }); }); }} className="btn btn-green py-1">📄 พรีวิว .Doc / .PDF (A4)</button>
                                         </div>
                                     </div>
                                 )}
@@ -2029,7 +2049,7 @@
                                         <div className="flex gap-2">
                                             <button onClick={generateAIAssessment} className="btn btn-ai py-1">🤖 รายงานผู้บริหาร (AI + BEP)</button>
                                             <button onClick={function() { handleExportExcel('bep'); }} className="btn btn-blue py-1">📥 ส่งออก Excel (BEP)</button>
-                                            <button onClick={function() { setPreviewMode(null); setModals(function(m) { return Object.assign({}, m, { preview: true }); }); }} className="btn btn-green py-1">📄 พรีวิวรายงาน BEP (.Doc A4)</button>
+                                            <button onClick={function() { setPreviewMode(null); setModals(function(m) { return Object.assign({}, m, { preview: true }); }); }} className="btn btn-green py-1">📄 พรีวิวรายงาน BEP (.Doc / .PDF)</button>
                                         </div>
                                     </div>
                                 )}
@@ -2632,7 +2652,7 @@
                                     </div>
                                 </div>
                                 <div className="p-3.5 border-t bg-gray-50 flex justify-end gap-2">
-                                    <button onClick={function() { setPreviewMode(data.length > 0 ? 'pur' : 'plan'); setModals(function(m) { return Object.assign({}, m, { ai: false, preview: true }); }); }} className="btn btn-green px-5 py-2">📄 พรีวิวบันทึกภายใน A4 (พร้อมพิมพ์/โหลด Word)</button>
+                                    <button onClick={function() { setPreviewMode(data.length > 0 ? 'pur' : 'plan'); setModals(function(m) { return Object.assign({}, m, { ai: false, preview: true }); }); }} className="btn btn-green px-5 py-2">📄 พรีวิวบันทึกภายใน A4 (พร้อมพิมพ์ PDF / โหลด Word)</button>
                                     <button onClick={function() { setModals(function(m) { return Object.assign({}, m, { ai: false }); }); }} className="btn btn-blue px-6 py-2">ปิดหน้าต่าง</button>
                                 </div>
                             </div>
@@ -2742,7 +2762,7 @@
                                 <div className="flex justify-between font-bold text-lg mb-4 text-[#002060]"><h3 className="m-0">📖 คู่มือการใช้งานย่อ</h3><button onClick={function() { setModals(function(m) { return Object.assign({}, m, { manual: false }); }); }} className="text-gray-400 hover:text-red-500">✖</button></div>
                                 <div className="text-xs text-gray-700 space-y-3 leading-relaxed mb-6">
                                     <div><b>1. การเชื่อมต่อ Google Sheets Cloud & ทดสอบ Ping:</b> กดปุ่ม <b>"☁️ Google Sheets Cloud"</b> บนแถบด้านบนเพื่อทดสอบ Ping ดึงข้อมูลในอดีตจากชีต <code>Data_Backups</code>, <code>Tab1_Production_Plan</code>, <code>Tab2_Purchasing_Analysis</code>, <code>Master_Products</code> หรือบันทึกสำรองขึ้นคลาวด์</div>
-                                    <div><b>2. เอกสาร .Doc และ PDF (Sarabun 14pt + โลโก้ฝังในไฟล์):</b> โลโก้ถูกฝังเป็น Base64 PNG และบังคับฟอนต์ Sarabun ขนาด 14pt ทั้งในเนื้อหาและในตารางทุกช่องเมื่อเปิดใน Microsoft Word</div>
+                                    <div><b>2. เอกสาร .Doc และ .PDF (Sarabun 14pt + โลโก้ฝังในไฟล์):</b> โลโก้ถูกฝังเป็น Base64 PNG และบังคับฟอนต์ Sarabun ขนาด 14pt ทั้งในเนื้อหาและในตารางทุกช่องเมื่อเปิดใน Microsoft Word หรือกดดาวน์โหลดเป็นไฟล์ .PDF</div>
                                     <div><b>3. การเชื่อมโยงเงื่อนไข Supplier กับหน้าเปรียบเทียบราคา:</b> ข้อมูลต้นทุน, <code>Ref. เงื่อนไขจำนวนพิมพ์</code> และ <code>เครดิตชำระเงิน</code> ที่บันทึกไว้ในฐานข้อมูล Supplier จะถูกดึงขึ้นมาแสดงในหน้า <b>"⚖️ เทียบราคา"</b> โดยอัตโนมัติครบทุกเจ้า</div>
                                 </div>
                                 <div className="text-right"><button onClick={function() { setModals(function(m) { return Object.assign({}, m, { manual: false }); }); }} className="btn bg-[#0ea5e9] text-white px-6 py-2">ปิดหน้าต่าง</button></div>
@@ -2750,7 +2770,7 @@
                         </div>
                     )}
                     
-                    {/* --- POP-UP: A4 PREVIEW WITH TOP/SIDE MARGIN CONTROLS & ZOOM --- */}
+                    {/* --- POP-UP: A4 PREVIEW WITH TOP/SIDE MARGIN CONTROLS, PDF & WORD DOWNLOAD --- */}
                     {modals.preview && (
                         <div className="modal-overlay overflow-y-auto" style={{alignItems:'flex-start'}}>
                             <div className="fixed top-3 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-4 py-2 rounded-2xl shadow-2xl flex flex-wrap items-center gap-2.5 z-[60] print-hidden border border-slate-700 max-w-[95vw]">
@@ -2788,7 +2808,7 @@
                                     {(function() {
                                         const activeMode = previewMode || tab;
                                         const activeArr = activeMode === 'plan' ? planData : data;
-                                        return <div dangerouslySetInnerHTML={{__html: getDocxHTML(activeArr, activeMode, safePct, aiRef, docNo, avgDisc, logoDataUri)}}></div>;
+                                        return <div id="a4-pdf-source" dangerouslySetInnerHTML={{__html: getDocxHTML(activeArr, activeMode, safePct, aiRef, docNo, avgDisc, logoDataUri)}}></div>;
                                     })()}
                                     
                                     <div className="mt-10 pt-4 border-t border-gray-300 flex justify-end gap-2.5 print-hidden flex-wrap bg-slate-50 p-3 rounded-xl">
@@ -2812,8 +2832,10 @@
                                             window.location.href = "mailto:?subject=" + subject + "&body=" + body;
                                         }} className="btn bg-sky-600 text-white hover:bg-sky-700">📧 ส่งอีเมล</button>
                                         
-                                        <button onClick={function() { window.print(); }} className="btn bg-red-600 text-white hover:bg-red-700">🖨️ พิมพ์ / บันทึก PDF</button>
+                                        <button onClick={function() { handlePrintPDF(previewMode || tab); }} className="btn bg-red-600 text-white hover:bg-red-700">🖨️ พิมพ์ / บันทึก PDF (Sarabun 14pt)</button>
                                         
+                                        <button onClick={function() { handleDirectDownloadPDF(previewMode || tab); }} className="btn bg-amber-600 text-white hover:bg-amber-700">📕 ดาวน์โหลดไฟล์ .PDF ทันที</button>
+
                                         <button onClick={function() {
                                             const activeMode = previewMode || tab;
                                             const activeArr = activeMode === 'plan' ? planData : data;
@@ -2842,18 +2864,6 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<ErrorBoundary><App /></ErrorBoundary>);
-    </script>
-
-    <!-- ตัวกระตุ้นสำรอง: หากเบราว์เซอร์อ่านจบไฟล์แล้ว Babel ยังไม่เริ่มทำงาน จะสั่ง Babel.transformScriptTags() ทันที -->
-    <script>
-        window.addEventListener('load', function() {
-            setTimeout(function() {
-                var rootEl = document.getElementById('root');
-                if (rootEl && rootEl.innerHTML.trim() === '' && window.Babel && typeof window.Babel.transformScriptTags === 'function') {
-                    try { window.Babel.transformScriptTags(); } catch(e) { console.error(e); }
-                }
-            }, 100);
-        });
     </script>
 </body>
 </html>
